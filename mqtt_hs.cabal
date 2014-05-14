@@ -30,3 +30,5 @@ Test-suite test-mqtt
   main-is: ut.hs
   build-depends: base
                  , HUnit
+                 , test-framework
+                 , test-framework-hunit
