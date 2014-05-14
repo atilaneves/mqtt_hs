@@ -26,7 +26,7 @@ executable mqtt_hs
 
 Test-suite test-mqtt
   type: exitcode-stdio-1.0
-  hs-source-dirs: tests
+  hs-source-dirs: tests, Mqtt/Message
   main-is: ut.hs
   build-depends: base
                  , HUnit
