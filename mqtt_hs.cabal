@@ -20,9 +20,10 @@ executable mqtt_hs
    main-is: main.hs
   -- other-modules:
   -- other-extensions:
-  build-depends:       base >=4.7 && <4.8
   hs-source-dirs:      src
   default-language:    Haskell2010
+  build-depends:       base >=4.7 && <4.8
+                       , binary
 
 Test-suite test-mqtt
   type: exitcode-stdio-1.0
