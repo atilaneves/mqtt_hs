@@ -1,9 +1,9 @@
 module Main where
 
 import Test.Framework (defaultMain)
-import Mqtt.Message.Test (test_encoding)
+import Mqtt.Broker.Test (testConnack)
 
-tests = [ test_encoding ]
+tests = [ testConnack ]
 
 main :: IO ()
 main = defaultMain tests
