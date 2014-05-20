@@ -22,14 +22,17 @@ executable mqtt_hs
   -- other-extensions:
   hs-source-dirs:      src
   default-language:    Haskell2010
+  default-extensions: ViewPatterns
   build-depends:       base >=4.7 && <4.8
                        , binary
                        , bytestring
 
 Test-suite test-mqtt
-  type: exitcode-stdio-1.0
-  hs-source-dirs: tests, Mqtt/Message
   main-is: ut.hs
+  type: exitcode-stdio-1.0
+  hs-source-dirs: tests, src
+  default-language: Haskell2010
+  default-extensions: ViewPatterns
   build-depends: base
                  , HUnit
                  , test-framework

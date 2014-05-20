@@ -6,6 +6,7 @@ import Test.HUnit
 import Data.ByteString.Lazy (uncons, pack, unpack)
 import Data.Char (ord)
 import Data.Word (Word8)
+import Mqtt.Broker (getReplies, Reply)
 
 testConnack = testGroup "Encoding" [ testCase "Test MQTT reply includes CONNACK" test_decode_mqtt_connect]
 
@@ -16,7 +17,7 @@ char x = (fromIntegral $ ord x) :: Word8
 
 
 test_decode_mqtt_connect :: Assertion
-test_decode_mqtt_connect = (unpack (request)) @?= ([1, 2] :: [Word8])
+test_decode_mqtt_connect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])] :: [Reply Integer])
                            where request = pack $ [0x10, 0x2a, -- fixed header
                                                         0x00, 0x06] ++
                                           [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p']++
@@ -27,5 +28,5 @@ test_decode_mqtt_connect = (unpack (request)) @?= ([1, 2] :: [Word8])
                                            0x00, 0x04, char 'w', char 'i', char 'l', char 'l', -- will topic
                                            0x00, 0x04, char 'w', char 'm', char 's', char 'g', -- will msg
                                            0x00, 0x07, char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l', --username
-                                           0x00, 0x02, char 'p', char 'w'] --password
+                                                   0x00, 0x02, char 'p', char 'w'] --password
                                 -- replies = Mqtt.Broker.getReplies request
