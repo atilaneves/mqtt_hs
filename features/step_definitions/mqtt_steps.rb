@@ -10,7 +10,7 @@ After do
 end
 
 def connect_to_broker_tcp(port = 1883)
-  @mqtt = IO.popen('runghc mqtt')
+  @mqtt = IO.popen('runghc src/main.hs')
   Timeout.timeout(1) do
     while @socket.nil?
       begin
@@ -35,8 +35,8 @@ def send_mqtt_connect
               0x00, 0x03, 'c'.ord, 'i'.ord, 'd'.ord, # client ID
               0x00, 0x04, 'w'.ord, 'i'.ord, 'l'.ord, 'l'.ord, # will topic
               0x00, 0x04, 'w'.ord, 'm'.ord, 's'.ord, 'g'.ord, # will msg
-              0x00, 0x07, 'g'.ord, 'l'.ord, 'i'.ord, 'f'.ord, 't'.ord, 'e'.ord, 'l'.ord, #username
-              0x00, 0x02, 'p'.ord, 'w'.ord, #password
+              0x00, 0x07, 'g'.ord, 'l'.ord, 'i'.ord, 'f'.ord, 't'.ord, 'e'.ord, 'l'.ord, # username
+              0x00, 0x02, 'p'.ord, 'w'.ord, # password
              ]
 end
 
@@ -71,15 +71,15 @@ Given(/^I have connected to the broker on port (\d+)$/) do |port|
 end
 
 When(/^I subscribe to a topic with msgId (\d+)$/) do |msgId|
-  send_bytes [ 0x82, 0x13, # fixed header
-               0x00, msgId.to_i, # message ID
-               0x00, 0x05, 'f'.ord, 'i'.ord, 'r'.ord, 's'.ord, 't'.ord,
-               0x01, #qos
-               0x00, 0x06, 's'.ord, 'e'.ord, 'c'.ord, 'o'.ord, 'n'.ord, 'd'.ord,
-               0x02, #qos
+  send_bytes [0x82, 0x13, # fixed header
+              0x00, msgId.to_i, # message ID
+              0x00, 0x05, 'f'.ord, 'i'.ord, 'r'.ord, 's'.ord, 't'.ord,
+              0x01, # qos
+              0x00, 0x06, 's'.ord, 'e'.ord, 'c'.ord, 'o'.ord, 'n'.ord, 'd'.ord,
+              0x02, # qos
              ]
 end
 
-Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |arg1, arg2|
+Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do ||
   assert_recv [0x90, 4, 0, 42, 1, 2]
 end
