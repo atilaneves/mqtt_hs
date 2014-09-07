@@ -2,7 +2,8 @@ module Main where
 
 import Network
 import Control.Concurrent
-import System.IO
+import System.IO (hGetLine, Handle)
+import Data.ByteString.Lazy (pack, hPutStr, hGetContents)
 
 main :: IO ()
 main = withSocketsDo $ do
@@ -18,6 +19,6 @@ socketHandler socket = do
 
 handleConnection:: Handle -> IO()
 handleConnection handle = do
-    request <- hGetLine handle
-    hPutStrLn handle ("MQTT reply! Nah, just kidding, but your request was:\n" ++ request)
+    request <- hGetContents handle
+    hPutStr handle (pack [32, 2, 0, 0]) -- CONNACK
     handleConnection handle
