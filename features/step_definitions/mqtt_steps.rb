@@ -10,7 +10,7 @@ After do
 end
 
 def connect_to_broker_tcp(port = 1883)
-  @mqtt = IO.popen('runghc src/main.hs')
+  @mqtt = IO.popen('dist/build/mqtt_hs/mqtt_hs')
   Timeout.timeout(1) do
     while @socket.nil?
       begin

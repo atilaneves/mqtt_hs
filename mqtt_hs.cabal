@@ -26,6 +26,7 @@ executable mqtt_hs
   build-depends:       base >=4.7 && <4.8
                        , binary
                        , bytestring
+                       , network
 
 Test-suite test-mqtt
   main-is: ut.hs
