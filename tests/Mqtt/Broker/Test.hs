@@ -1,4 +1,4 @@
-module Mqtt.Broker.Test (testConnack) where
+module Mqtt.Broker.Test (testConnack, testSuback) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -38,4 +38,17 @@ test_decode_mqtt_connect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])
                                            0x00, 0x07,
                                            char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l', --username
                                            0x00, 0x02, char 'p', char 'w'] --password
-                                -- replies = Mqtt.Broker.getReplies request
+                                                                           -- replies = Mqtt.Broker.getReplies request
+
+
+
+testSuback = testGroup "Encoding" [ testCase "Test MQTT reply to subscribe message" test_suback_recvd]
+test_suback_recvd :: Assertion
+test_suback_recvd = getReplies 4 request [] @?= ([(4, pack [0x90, 0x03, 0x00, 0x21, 0x00])] :: [Reply Integer])
+                    where request = pack $ [0x8c, 0x10, -- fixed header
+                                            0x00, 0x21, -- message ID
+                                            0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
+                                            0x01, -- qos
+                                            0x00, 0x03, char 'f', char 'o', char 'o',
+                                            0x02 -- qos
+                                            ]

@@ -80,6 +80,6 @@ When(/^I subscribe to a topic with msgId (\d+)$/) do |msgId|
              ]
 end
 
-Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do ||
-  assert_recv [0x90, 4, 0, 42, 1, 2]
+Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |qos, msgId|
+  assert_recv [0x90, 4, 0, msgId, qos]
 end
