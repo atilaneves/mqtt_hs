@@ -70,16 +70,14 @@ Given(/^I have connected to the broker on port (\d+)$/) do |port|
   connect_to_broker_mqtt(port)
 end
 
-When(/^I subscribe to a topic with msgId (\d+)$/) do |msgId|
-  send_bytes [0x82, 0x13, # fixed header
+When(/^I subscribe to one topic with msgId (\d+)$/) do |msgId|
+  send_bytes [0x82, 10, # fixed header
               0x00, msgId.to_i, # message ID
               0x00, 0x05, 'f'.ord, 'i'.ord, 'r'.ord, 's'.ord, 't'.ord,
               0x01, # qos
-              0x00, 0x06, 's'.ord, 'e'.ord, 'c'.ord, 'o'.ord, 'n'.ord, 'd'.ord,
-              0x02, # qos
              ]
 end
 
 Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |qos, msgId|
-  assert_recv [0x90, 4, 0, msgId, qos]
+  assert_recv [0x90, 4, 0, msgId.to_i, qos.to_i]
 end
