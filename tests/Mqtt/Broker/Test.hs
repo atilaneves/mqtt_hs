@@ -8,8 +8,8 @@ import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (getReplies, getMessageType, Reply)
 
-testConnack = testGroup "Encoding" [ testCase "Test MQTT reply includes CONNACK" test_decode_mqtt_connect,
-                                     testCase "Test getting message type" test_get_message_type]
+testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" test_decode_mqtt_connect,
+                                    testCase "Test getting message type" test_get_message_type]
 
 
 -- Helper to transform a character into a byte
@@ -42,9 +42,10 @@ test_decode_mqtt_connect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])
 
 
 
-testSuback = testGroup "Encoding" [ testCase "Test MQTT reply to subscribe message" test_suback_recvd]
-test_suback_recvd :: Assertion
-test_suback_recvd = getReplies 4 request [] @?= ([(4, pack [0x90, 0x03, 0x00, 0x21, 0x00])] :: [Reply Integer])
+testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe message" testSubackTwoTopics,
+                                     testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic]
+testSubackTwoTopics :: Assertion
+testSubackTwoTopics = getReplies 4 request [] @?= ([(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])] :: [Reply Integer])
                     where request = pack $ [0x8c, 0x10, -- fixed header
                                             0x00, 0x21, -- message ID
                                             0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
@@ -52,3 +53,11 @@ test_suback_recvd = getReplies 4 request [] @?= ([(4, pack [0x90, 0x03, 0x00, 0x
                                             0x00, 0x03, char 'f', char 'o', char 'o',
                                             0x02 -- qos
                                             ]
+
+testSubackOneTopic :: Assertion
+testSubackOneTopic = getReplies 7 request [] @?= ([(7, pack [0x90, 0x03, 0x00, 0x33, 0])] :: [Reply Integer])
+                     where request = pack $ [0x8c, 8, -- fixed header
+                                             0x00, 0x33, -- message ID
+                                             0x00, 0x03, char 'f', char 'o', char 'o',
+                                             0x01 -- qos
+                                             ]
