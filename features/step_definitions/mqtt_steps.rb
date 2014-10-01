@@ -36,8 +36,7 @@ def send_mqtt_connect
               0x00, 0x04, 'w'.ord, 'i'.ord, 'l'.ord, 'l'.ord, # will topic
               0x00, 0x04, 'w'.ord, 'm'.ord, 's'.ord, 'g'.ord, # will msg
               0x00, 0x07, 'g'.ord, 'l'.ord, 'i'.ord, 'f'.ord, 't'.ord, 'e'.ord, 'l'.ord, # username
-              0x00, 0x02, 'p'.ord, 'w'.ord, # password
-             ]
+              0x00, 0x02, 'p'.ord, 'w'.ord] # password
 end
 
 Given(/^I have established a TCP connection to the broker on port (\d+)$/) do |port|
@@ -71,9 +70,9 @@ Given(/^I have connected to the broker on port (\d+)$/) do |port|
 end
 
 When(/^I subscribe to one topic with msgId (\d+)$/) do |msgId|
-  send_bytes [0x82, 10, # fixed header
-              0x00, msgId.to_i, # message ID
-              0x00, 0x05, 'f'.ord, 'i'.ord, 'r'.ord, 's'.ord, 't'.ord,
+  send_bytes [0x8c, 10, # fixed header
+              0, msgId.to_i, # message ID
+              0, 5, 'f'.ord, 'i'.ord, 'r'.ord, 's'.ord, 't'.ord,
               0x01, # qos
              ]
 end

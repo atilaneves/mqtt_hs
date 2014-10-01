@@ -11,9 +11,9 @@ type Subscription = Topic
 type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in real life)
 
 getReplies :: a -> BS.ByteString -> [Subscription] -> [Reply a]
-getReplies _ (uncons -> Nothing) _ = []
-getReplies handle packet _ = case getMessageType packet of -- 1st _ is xs, 2nd subscriptions
-    1 -> [(handle, pack [32, 2, 0, 0])] --connect gets connack
+getReplies _ (uncons -> Nothing) _ = []  -- 1st _ is xs, 2nd subscriptions
+getReplies handle packet _ = case getMessageType packet of
+    1 -> [(handle, pack [32, 2, 0, 0])] -- connect gets connack
     8 -> getSubackReply handle packet
     _ -> []
 
@@ -28,7 +28,6 @@ getSubackReply handle packet = [(handle, pack $ [fixedHeader, remainingLength] +
           msgId = serialise $ getSubscriptionMsgId packet
           qoss = take (getNumTopics packet) (repeat 0)
           remainingLength = fromIntegral $ (length qoss) + (length msgId)
-
 
 -- massive hack that assumes remaining length is one byte long
 getSubscriptionMsgId :: (Num a) => BS.ByteString -> a

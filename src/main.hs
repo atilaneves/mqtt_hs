@@ -2,9 +2,9 @@ module Main where
 
 import Network
 import Control.Concurrent
-import System.IO (Handle)
-import Data.ByteString.Lazy (hPutStr, hGetContents)
-import Mqtt.Broker (getReplies)
+import System.IO (Handle, hSetBinaryMode, hSetBuffering, BufferMode(NoBuffering))
+import Data.ByteString.Lazy (hPutStr, hGetContents, unpack, hGetNonBlocking)
+import Mqtt.Broker (getReplies, Reply)
 
 main :: IO ()
 main = withSocketsDo $ do
@@ -15,13 +15,28 @@ main = withSocketsDo $ do
 socketHandler :: Socket -> IO ThreadId
 socketHandler socket = do
     (handle, _, _) <- accept socket
+    hSetBinaryMode handle True
+    hSetBuffering handle NoBuffering
     forkIO $ handleConnection handle
     socketHandler socket
 
 handleConnection:: Handle -> IO ()
 handleConnection handle = do
-    request <- hGetContents handle
-    let replies = getReplies handle request []
-    --hPutStr handle (pack [32, 2, 0, 0]) -- CONNACK
-    hPutStr handle (snd (head replies))
-    handleConnection handle
+    -- request <- hGetContents handle
+  request <- hGetNonBlocking handle 1024
+  putStrLn $ "request: " ++ show (unpack request)
+  let replies = getReplies handle request []
+  putStrLn "Going to call handleReplies"
+  handleReplies handle $! replies
+  putStrLn "Recursing handleConnection"
+  handleConnection handle
+
+handleReplies :: Handle -> [Reply Handle] -> IO ()
+handleReplies _ [] = putStrLn "WTF?"
+handleReplies handle replies = do
+  putStrLn "Sending reply back"
+  putStrLn $ "Number of bytes: " ++ (show (length (unpack packet)))
+  hPutStr handle packet
+    where reply = head replies
+          --handle = fst reply
+          packet = snd reply

@@ -56,8 +56,8 @@ testSubackTwoTopics = getReplies 4 request [] @?= ([(4, pack [0x90, 0x04, 0x00, 
 
 testSubackOneTopic :: Assertion
 testSubackOneTopic = getReplies 7 request [] @?= ([(7, pack [0x90, 0x03, 0x00, 0x33, 0])] :: [Reply Integer])
-                     where request = pack $ [0x8c, 8, -- fixed header
-                                             0x00, 0x33, -- message ID
-                                             0x00, 0x03, char 'f', char 'o', char 'o',
+                     where request = pack $ [0x8c, 10, -- fixed header
+                                             0, 0x33, -- message ID
+                                             0, 5, char 'f', char 'i', char 'r', char 's', char 't',
                                              0x01 -- qos
                                              ]
