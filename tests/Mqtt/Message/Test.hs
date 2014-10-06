@@ -3,7 +3,7 @@ module Mqtt.Message.Test (testEncoding) where
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString.Lazy (pack)
+import Data.ByteString (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
 import Mqtt.Broker (getNumTopics)

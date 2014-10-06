@@ -3,7 +3,7 @@ module Mqtt.Broker.Test (testConnack, testSuback) where
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString.Lazy (pack)
+import Data.ByteString (pack)
 import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (getReplies, getMessageType, Reply)

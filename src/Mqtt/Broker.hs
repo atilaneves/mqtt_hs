@@ -1,10 +1,10 @@
 module Mqtt.Broker (getReplies, getMessageType, Reply, getNumTopics) where
 
-import Data.ByteString.Lazy (uncons, pack)
+import Data.ByteString (uncons, pack)
 import Data.Bits (shiftR, shiftL, (.&.))
 import Data.Word (Word8, Word16)
-import Data.Binary.Get
-import qualified Data.ByteString.Lazy as BS
+import Data.Binary.Strict.Get
+import qualified Data.ByteString as BS
 
 type Topic = String
 type Subscription = Topic
@@ -40,7 +40,11 @@ serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 
 
 getNumTopics :: BS.ByteString -> Int
-getNumTopics packet = runGet numberOfTopicsRunner packet
+getNumTopics packet = fromEither (runGet numberOfTopicsRunner packet)
+
+fromEither:: (Either String Int, a) -> Int
+fromEither (Left _, _) = 0
+fromEither (Right x, _) = x
 
 numberOfTopicsRunner :: Get Int
 numberOfTopicsRunner = do
