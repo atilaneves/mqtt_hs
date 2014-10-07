@@ -6,7 +6,7 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
-import Mqtt.Broker (getNumTopics)
+import Mqtt.Message (getNumTopics)
 
 
 -- Helper to transform a character into a byte
