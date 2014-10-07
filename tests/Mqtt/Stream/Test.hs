@@ -4,7 +4,7 @@ import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
 import qualified Data.ByteString as BS
-import Data.ByteString (pack)
+import Data.ByteString (pack, append)
 import Data.Word (Word8)
 import Data.Char (ord)
 import Mqtt.Stream (nextMessage)
@@ -14,6 +14,7 @@ testStream = testGroup "TCP Streams" [ testCase "Test 0 bytes" testNoBytes
                                      , testCase "Test 1 byte" testOneByte
                                      , testCase "Test only connect header" testOnlyConnectHeader
                                      , testCase "Test only connect message" testOnlyConnectMsg
+                                     , testCase "Test connect msg + garbage" testConnectMsgThenGarbage
                                      ]
 
 
@@ -51,3 +52,8 @@ testOnlyConnectHeader = nextMessage connectHdr @?= (emptyByteStr, connectHdr)
 
 testOnlyConnectMsg :: Assertion
 testOnlyConnectMsg = nextMessage connectMsg @?= (connectMsg, emptyByteStr)
+
+
+testConnectMsgThenGarbage :: Assertion
+testConnectMsgThenGarbage = nextMessage (connectMsg `append` garbage) @?= (connectMsg, garbage)
+    where garbage = pack [1, 2, 3]
