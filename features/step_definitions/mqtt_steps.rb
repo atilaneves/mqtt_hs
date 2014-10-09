@@ -4,7 +4,7 @@ require 'timeout'
 After do
   @socket.nil? || @socket.close
   unless @mqtt.nil?
-    Process.kill('INT', @mqtt.pid)
+    Process.kill('QUIT', @mqtt.pid)
     Process.wait(@mqtt.pid)
   end
 end
