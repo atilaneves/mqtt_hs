@@ -70,16 +70,22 @@ Given(/^I have connected to the broker on port (\d+)$/) do |port|
   connect_to_broker_mqtt(port)
 end
 
-When(/^I subscribe to one topic with msgId (\d+)$/) do |msgId|
+def subscribe(topic, msg_id, qos = 0)
   send_bytes [0x8c, 10, # fixed header
-              0, msgId.to_i, # message ID
-              0, 5, 'f'.ord, 'i'.ord, 'r'.ord, 's'.ord, 't'.ord,
-              0x01, # qos
-             ]
+              0, msg_id, # message ID
+              0, topic.length] + string_to_ints("first") + [qos]
 end
 
-Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |qos, msgId|
-  assert_recv [0x90, 3, 0, msgId.to_i, qos.to_i]
+When(/^I subscribe to one topic with msgId (\d+)$/) do |msg_id|
+  subscribe('topic', msg_id.to_i)
+end
+
+def recv_suback(msg_id, qos = 0)
+  assert_recv [0x90, 3, 0, msg_id.to_i, qos.to_i]
+end
+
+Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |qos, msg_id|
+  recv_suback(msg_id.to_i, qos.to_i)
 end
 
 When(/^I publish on topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
@@ -98,4 +104,28 @@ Then(/^I should not receive any messages$/) do
       assert_recv []
     end
   end.to raise_error
+end
+
+msg_id = 1
+When(/^I subscribe to topic "(.*?)"$/) do |topic|
+  remaining_length = topic.length + 4
+  qos = 1
+  send_bytes [0x8c, remaining_length,
+              0, msg_id,
+              0, topic.length] + string_to_ints(topic) + [qos]
+  msg_id += 1
+end
+
+Then(/^I should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
+  Timeout.timeout(1) do
+    remaining_length = topic.length + 2 + payload.length
+    assert_recv [0x30, remaining_length, 0, topic.length] + \
+      string_to_ints(topic) + string_to_ints(payload)
+  end
+end
+
+
+When(/^I successfully subscribe to topic "(.*?)"$/) do |topic|
+  subscribe(topic, msg_id)
+  recv_suback(msg_id)
 end
