@@ -6,7 +6,7 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
-import Mqtt.Message (getNumTopics, remainingSize, getMessageType, MqttType(Connect, ConnAck))
+import Mqtt.Message (getNumTopics, getMessageType, getRemainingLength, MqttType(Connect, ConnAck))
 import qualified Data.ByteString as BS
 
 
@@ -16,8 +16,8 @@ char x = (fromIntegral $ ord x) :: Word8
 
 
 testEncoding = testGroup "Encoding" [ testCase "Test get number of topics" testDecodeNumberTopics
-                                    , testCase "Test size of connect msg" testSizeOfConnect
                                     , testCase "Test getting the message type of a packet" testGetMessageType
+                                    , testCase "Test getting the remaining size" testGetRemainingSize
                                     ]
 
 
@@ -35,12 +35,18 @@ testDecodeNumberTopics :: Assertion
 testDecodeNumberTopics = getNumTopics connectMsg @?= 2
 
 
-testSizeOfConnect :: Assertion
-testSizeOfConnect = remainingSize connectMsg @?= 16
-
-
 -- Test that message types are returned correctly from a byte string
 testGetMessageType :: Assertion
 testGetMessageType = do
   getMessageType (pack [0x10, 0x2a]) @?= Connect
   getMessageType (pack [0x20, 0x2a]) @?= ConnAck
+
+
+testGetRemainingSize :: Assertion
+testGetRemainingSize = do
+  getRemainingLength connectMsg @?= 16
+  getRemainingLength (pack [0x15, 5]) @?= 5
+  getRemainingLength (pack [0x27, 7]) @?= 7
+  getRemainingLength (pack [0x12, 0xc1, 0x02]) @?= 321
+  getRemainingLength (pack [0x12, 0x83, 0x02]) @?= 259
+  getRemainingLength (pack [0x12, 0x85, 0x80, 0x80, 0x01]) @?= 2097157

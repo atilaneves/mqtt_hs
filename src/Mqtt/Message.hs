@@ -2,12 +2,12 @@ module Mqtt.Message (getMessageType,
                      getSubscriptionMsgId,
                      getNumTopics,
                      MqttType(Connect, ConnAck, Subscribe),
-                     remainingSize) where
+                     getRemainingLength) where
 
 
 import qualified Data.ByteString as BS
 import Data.ByteString (uncons)
-import Data.Bits (shiftL, shiftR)
+import Data.Bits (shiftL, shiftR, (.&.))
 import Data.Binary.Strict.Get
 
 
@@ -35,15 +35,25 @@ getMessageType :: BS.ByteString -> MqttType
 getMessageType (uncons -> Nothing) = Reserved1
 getMessageType (uncons -> Just (msgType, _)) = toEnum $ (fromIntegral msgType) `shiftR` 4
 
-remainingSize :: BS.ByteString -> Int
-remainingSize pkt = fromEither (runGet getRemainingSize pkt)
+getRemainingLength :: BS.ByteString -> Int
+getRemainingLength pkt = fromEither $ runGet remainingLengthGetter pkt
 
 
-getRemainingSize :: Get Int
-getRemainingSize = do
+remainingLengthGetter :: Get Int
+remainingLengthGetter = do
   getWord8 -- fixedHeader
-  size <- getWord8
-  return $ fromIntegral size
+  let value = 0
+  let multiplier = 1
+  remainingLengthGetterInner value multiplier
+
+
+remainingLengthGetterInner :: Int -> Int -> Get Int
+remainingLengthGetterInner value multiplier = do
+  digit <- getWord8
+  let newValue = value + (fromIntegral digit .&. 127) * multiplier
+  if digit .&. 128 == 0
+  then return newValue
+  else remainingLengthGetterInner newValue (multiplier * 128)
 
 
 -- massive hack that assumes remaining length is one byte long
