@@ -6,10 +6,11 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Char (ord)
 import Data.Word (Word8)
-import Mqtt.Broker (getReplies, getMessageType, Reply)
+import Mqtt.Broker (getReplies, Reply)
 
-testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" test_decode_mqtt_connect,
-                                    testCase "Test getting message type" test_get_message_type]
+
+testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" testDecodeMqttConnect
+                                  ]
 
 
 -- Helper to transform a character into a byte
@@ -17,15 +18,9 @@ char :: Char -> Word8
 char x = (fromIntegral $ ord x) :: Word8
 
 
--- Test that message types are returned correctly from a byte string
-test_get_message_type :: Assertion
-test_get_message_type = do
-  getMessageType (pack [0x10, 0x2a]) @?= 1
-  getMessageType (pack [0x20, 0x2a]) @?= 2
-
 -- Test that we get a MQTT CONNACK in reply to a CONNECT message
-test_decode_mqtt_connect :: Assertion
-test_decode_mqtt_connect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])] :: [Reply Integer])
+testDecodeMqttConnect :: Assertion
+testDecodeMqttConnect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])] :: [Reply Integer])
                            where request = pack $ [0x10, 0x2a, -- fixed header
                                                    0x00, 0x06] ++
                                           [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p'] ++

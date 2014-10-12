@@ -6,7 +6,7 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
-import Mqtt.Message (getNumTopics, remainingSize)
+import Mqtt.Message (getNumTopics, remainingSize, getMessageType)
 import qualified Data.ByteString as BS
 
 
@@ -17,6 +17,7 @@ char x = (fromIntegral $ ord x) :: Word8
 
 testEncoding = testGroup "Encoding" [ testCase "Test get number of topics" testDecodeNumberTopics
                                     , testCase "Test size of connect msg" testSizeOfConnect
+                                    , testCase "Test getting the message type of a packet" testGetMessageType
                                     ]
 
 
@@ -36,3 +37,10 @@ testDecodeNumberTopics = getNumTopics connectMsg @?= 2
 
 testSizeOfConnect :: Assertion
 testSizeOfConnect = remainingSize connectMsg @?= 16
+
+
+-- Test that message types are returned correctly from a byte string
+testGetMessageType :: Assertion
+testGetMessageType = do
+  getMessageType (pack [0x10, 0x2a]) @?= 1
+  getMessageType (pack [0x20, 0x2a]) @?= 2
