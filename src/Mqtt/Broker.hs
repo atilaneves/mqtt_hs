@@ -23,7 +23,7 @@ getReplies handle packet _ = case getMessageType packet of
 getSubackReply :: a -> BS.ByteString -> [Reply a]
 getSubackReply handle packet = [(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)]
     where fixedHeader = 0x90
-          msgId = serialise $ getSubscriptionMsgId packet
+          msgId = serialise $ fromIntegral (getSubscriptionMsgId packet)
           qoss = take (getNumTopics packet) (repeat 0)
           remainingLength = fromIntegral $ (length qoss) + (length msgId)
 

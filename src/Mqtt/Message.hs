@@ -9,6 +9,7 @@ import qualified Data.ByteString as BS
 import Data.ByteString (uncons)
 import Data.Bits (shiftL, shiftR, (.&.))
 import Data.Binary.Strict.Get
+import Data.Word (Word16)
 
 
 data MqttType = Reserved1
@@ -30,14 +31,13 @@ data MqttType = Reserved1
                 deriving (Enum, Show, Eq)
 
 
-
 getMessageType :: BS.ByteString -> MqttType
 getMessageType (uncons -> Nothing) = Reserved1
 getMessageType (uncons -> Just (msgType, _)) = toEnum $ (fromIntegral msgType) `shiftR` 4
 
+
 getRemainingLength :: BS.ByteString -> Int
 getRemainingLength pkt = fromEither $ runGet remainingLengthGetter pkt
-
 
 remainingLengthGetter :: Get Int
 remainingLengthGetter = do
@@ -45,7 +45,6 @@ remainingLengthGetter = do
   let value = 0
   let multiplier = 1
   remainingLengthGetterInner value multiplier
-
 
 remainingLengthGetterInner :: Int -> Int -> Get Int
 remainingLengthGetterInner value multiplier = do
@@ -56,19 +55,25 @@ remainingLengthGetterInner value multiplier = do
   else remainingLengthGetterInner newValue (multiplier * 128)
 
 
--- massive hack that assumes remaining length is one byte long
-getSubscriptionMsgId :: (Num a) => BS.ByteString -> a
-getSubscriptionMsgId (uncons -> Nothing) = 0
-getSubscriptionMsgId (uncons -> Just (_, uncons -> Just(_, uncons -> Just(msgIdHi, uncons -> Just (msgIdLo, _))))) = fromIntegral $ msgIdHi `shiftL` 8 + msgIdLo
+getSubscriptionMsgId :: BS.ByteString -> Word16
+getSubscriptionMsgId pkt = fromEither $ runGet subscriptionIdGetter pkt
 
+subscriptionIdGetter :: Get Word16
+subscriptionIdGetter = do
+  remainingLengthGetter
+  msgIdHi <- getWord8
+  msgIdLo <- getWord8
+  return $ (fromIntegral msgIdHi) `shiftL` 8 + (fromIntegral msgIdLo)
 
 
 getNumTopics :: BS.ByteString -> Int
 getNumTopics packet = fromEither (runGet numberOfTopicsRunner packet)
 
-fromEither:: (Either String Int, a) -> Int
+
+fromEither:: (Num n) => (Either String n, a) -> n
 fromEither (Left _, _) = 0
 fromEither (Right x, _) = x
+
 
 numberOfTopicsRunner :: Get Int
 numberOfTopicsRunner = do

@@ -6,7 +6,11 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
-import Mqtt.Message (getNumTopics, getMessageType, getRemainingLength, MqttType(Connect, ConnAck))
+import Mqtt.Message (getNumTopics,
+                     getMessageType,
+                     getRemainingLength,
+                     getSubscriptionMsgId,
+                     MqttType(Connect, ConnAck))
 import qualified Data.ByteString as BS
 
 
@@ -18,6 +22,7 @@ char x = (fromIntegral $ ord x) :: Word8
 testEncoding = testGroup "Encoding" [ testCase "Test get number of topics" testDecodeNumberTopics
                                     , testCase "Test getting the message type of a packet" testGetMessageType
                                     , testCase "Test getting the remaining size" testGetRemainingSize
+                                    , testCase "Test getting the subscription id" testGetSubscriptionId
                                     ]
 
 
@@ -50,3 +55,9 @@ testGetRemainingSize = do
   getRemainingLength (pack [0x12, 0xc1, 0x02]) @?= 321
   getRemainingLength (pack [0x12, 0x83, 0x02]) @?= 259
   getRemainingLength (pack [0x12, 0x85, 0x80, 0x80, 0x01]) @?= 2097157
+
+
+testGetSubscriptionId :: Assertion
+testGetSubscriptionId = do
+  getSubscriptionMsgId (pack [0x80, 2, 0, 4]) @?= 4
+  getSubscriptionMsgId (pack [0x80, 2, 1, 4]) @?= 260
