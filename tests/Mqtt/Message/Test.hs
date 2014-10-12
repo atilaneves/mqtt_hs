@@ -6,7 +6,7 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
-import Mqtt.Message (getNumTopics, remainingSize, getMessageType)
+import Mqtt.Message (getNumTopics, remainingSize, getMessageType, MqttType(Connect, ConnAck))
 import qualified Data.ByteString as BS
 
 
@@ -42,5 +42,5 @@ testSizeOfConnect = remainingSize connectMsg @?= 16
 -- Test that message types are returned correctly from a byte string
 testGetMessageType :: Assertion
 testGetMessageType = do
-  getMessageType (pack [0x10, 0x2a]) @?= 1
-  getMessageType (pack [0x20, 0x2a]) @?= 2
+  getMessageType (pack [0x10, 0x2a]) @?= Connect
+  getMessageType (pack [0x20, 0x2a]) @?= ConnAck

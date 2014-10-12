@@ -1,6 +1,6 @@
 module Mqtt.Broker (getReplies, getMessageType, Reply, getNumTopics) where
 
-import Mqtt.Message (getMessageType, getSubscriptionMsgId, getNumTopics)
+import Mqtt.Message (getMessageType, getSubscriptionMsgId, getNumTopics, MqttType(Connect, Subscribe))
 import qualified Data.ByteString as BS
 import Data.ByteString (uncons, pack)
 import Data.Bits (shiftR, (.&.))
@@ -15,8 +15,8 @@ type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in real l
 getReplies :: a -> BS.ByteString -> [Subscription] -> [Reply a]
 getReplies _ (uncons -> Nothing) _ = []  -- 1st _ is xs, 2nd subscriptions
 getReplies handle packet _ = case getMessageType packet of
-    1 -> [(handle, pack [32, 2, 0, 0])] -- connect gets connack
-    8 -> getSubackReply handle packet
+    Connect -> [(handle, pack [32, 2, 0, 0])] -- connect gets connack
+    Subscribe -> getSubackReply handle packet
     _ -> []
 
 

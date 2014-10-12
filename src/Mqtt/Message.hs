@@ -1,4 +1,8 @@
-module Mqtt.Message (getMessageType, getSubscriptionMsgId, getNumTopics, remainingSize) where
+module Mqtt.Message (getMessageType,
+                     getSubscriptionMsgId,
+                     getNumTopics,
+                     MqttType(Connect, ConnAck, Subscribe),
+                     remainingSize) where
 
 
 import qualified Data.ByteString as BS
@@ -7,9 +11,29 @@ import Data.Bits (shiftL, shiftR)
 import Data.Binary.Strict.Get
 
 
-getMessageType :: BS.ByteString -> Int
-getMessageType (uncons -> Nothing) = 0
-getMessageType (uncons -> Just (msgType, _)) = fromIntegral $ msgType `shiftR` 4
+data MqttType = Reserved1
+              | Connect
+              | ConnAck
+              | Publish
+              | PubAck
+              | PubRec
+              | PubRel
+              | PubComp
+              | Subscribe
+              | SubAck
+              | Unsubscribe
+              | UnsubAck
+              | PingReq
+              | PingResp
+              | Disconnect
+              | Reserved2
+                deriving (Enum, Show, Eq)
+
+
+
+getMessageType :: BS.ByteString -> MqttType
+getMessageType (uncons -> Nothing) = Reserved1
+getMessageType (uncons -> Just (msgType, _)) = toEnum $ (fromIntegral msgType) `shiftR` 4
 
 remainingSize :: BS.ByteString -> Int
 remainingSize pkt = fromEither (runGet getRemainingSize pkt)
