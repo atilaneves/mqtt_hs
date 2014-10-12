@@ -1,5 +1,6 @@
 require 'socket'
 require 'timeout'
+require 'rspec-expectations'
 
 After do
   @socket.nil? || @socket.close
@@ -79,4 +80,22 @@ end
 
 Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |qos, msgId|
   assert_recv [0x90, 3, 0, msgId.to_i, qos.to_i]
+end
+
+When(/^I publish on topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
+  remaining_length = topic.length + 2 + payload.length
+  send_bytes [0x30, remaining_length, 0, topic.length] + \
+    string_to_ints(topic) + string_to_ints(payload)
+end
+
+def string_to_ints(str)
+  str.chars.map { |x| x.ord }
+end
+
+Then(/^I should not receive any messages$/) do
+  expect do
+    Timeout.timeout(1) do
+      assert_recv []
+    end
+  end.to raise_error
 end
