@@ -1,4 +1,8 @@
-module Mqtt.Broker (getReplies, getMessageType, Reply, getNumTopics) where
+module Mqtt.Broker (getReplies
+                   , getMessageType
+                   , Reply
+                   , getNumTopics
+                   ) where
 
 import Mqtt.Message (getMessageType, getSubscriptionMsgId, getNumTopics, MqttType(Connect, Subscribe))
 import qualified Data.ByteString as BS

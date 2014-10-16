@@ -71,9 +71,9 @@ Given(/^I have connected to the broker on port (\d+)$/) do |port|
 end
 
 def subscribe(topic, msg_id, qos = 0)
-  send_bytes [0x8c, 10, # fixed header
+  send_bytes [0x8c, 5 + topic.length, # fixed header
               0, msg_id, # message ID
-              0, topic.length] + string_to_ints("first") + [qos]
+              0, topic.length] + string_to_ints(topic)  + [qos]
 end
 
 When(/^I subscribe to one topic with msgId (\d+)$/) do |msg_id|

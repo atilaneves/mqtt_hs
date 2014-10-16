@@ -6,7 +6,10 @@ import Test.HUnit
 import Data.ByteString (pack)
 import Data.Char (ord)
 import Data.Word (Word8)
-import Mqtt.Broker (getReplies, Reply)
+import Mqtt.Broker (
+                    getReplies
+                   , Reply
+                   )
 
 
 testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" testDecodeMqttConnect
@@ -37,8 +40,10 @@ testDecodeMqttConnect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])] :
 
 
 
-testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe message" testSubackTwoTopics,
-                                     testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic]
+testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe message" testSubackTwoTopics
+                                   , testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic
+                                   , testCase "Test MQTT reply for SUBSCRIBE" testGetSuback
+                                   ]
 testSubackTwoTopics :: Assertion
 testSubackTwoTopics = getReplies 4 request [] @?= ([(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])] :: [Reply Integer])
                     where request = pack $ [0x8c, 0x10, -- fixed header
@@ -56,3 +61,11 @@ testSubackOneTopic = getReplies 7 request [] @?= ([(7, pack [0x90, 0x03, 0x00, 0
                                              0, 5, char 'f', char 'i', char 'r', char 's', char 't',
                                              0x01 -- qos
                                              ]
+
+
+testGetSuback :: Assertion
+testGetSuback = do
+   getReplies 9 (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [] @?= ([(9, pack $ [0x90, 3, 0, 7, 0])] :: [Reply Int])
+   getReplies 11 (pack [0x8c, 7, 0, 8, 0, 1, char 'f', 2]) [] @?= ([(11, pack $ [0x90, 3, 0, 8, 0])] :: [Reply Int])
+   getReplies 6 (pack [0x8c, 11, 0, 13, 0, 1, char 'f', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
+                  ([(6, pack $ [0x90, 4, 0, 13, 0, 0])] :: [Reply Int])
