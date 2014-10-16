@@ -8,7 +8,7 @@ import qualified Data.ByteString as BS
 import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (
-                    getReplies
+                    handleRequest
                    , Reply
                    )
 
@@ -24,7 +24,7 @@ char x = (fromIntegral $ ord x) :: Word8
 
 -- Test that we get a MQTT CONNACK in reply to a CONNECT message
 testDecodeMqttConnect :: Assertion
-testDecodeMqttConnect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])] :: [Reply Integer])
+testDecodeMqttConnect = handleRequest (3::Int) request [] @?= ([], [(3, pack [32, 2, 0, 0])])
                            where request = pack $ [0x10, 0x2a, -- fixed header
                                                    0x00, 0x06] ++
                                           [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p'] ++
@@ -37,16 +37,17 @@ testDecodeMqttConnect = getReplies 3 request [] @?= ([(3, pack [32, 2, 0, 0])] :
                                            0x00, 0x07,
                                            char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l', --username
                                            0x00, 0x02, char 'p', char 'w'] --password
-                                                                           -- replies = Mqtt.Broker.getReplies request
+                                                                           -- replies = Mqtt.Broker.handleRequest request
 
 
 
 testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe message" testSubackTwoTopics
                                    , testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic
                                    , testCase "Test MQTT reply for SUBSCRIBE" testGetSuback
+                                   , testCase "Test subscribe" testSubscribe
                                    ]
 testSubackTwoTopics :: Assertion
-testSubackTwoTopics = getReplies 4 request [] @?= ([(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])] :: [Reply Integer])
+testSubackTwoTopics = handleRequest (4::Int) request [] @?= (["first", "foo"], [(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])])
                     where request = pack $ [0x8c, 0x10, -- fixed header
                                             0x00, 0x21, -- message ID
                                             0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
@@ -56,7 +57,7 @@ testSubackTwoTopics = getReplies 4 request [] @?= ([(4, pack [0x90, 0x04, 0x00, 
                                             ]
 
 testSubackOneTopic :: Assertion
-testSubackOneTopic = getReplies 7 request [] @?= ([(7, pack [0x90, 0x03, 0x00, 0x33, 0])] :: [Reply Integer])
+testSubackOneTopic = handleRequest (7::Int) request [] @?= (["first"], [(7, pack [0x90, 0x03, 0x00, 0x33, 0])])
                      where request = pack $ [0x8c, 10, -- fixed header
                                              0, 0x33, -- message ID
                                              0, 5, char 'f', char 'i', char 'r', char 's', char 't',
@@ -66,10 +67,23 @@ testSubackOneTopic = getReplies 7 request [] @?= ([(7, pack [0x90, 0x03, 0x00, 0
 
 testGetSuback :: Assertion
 testGetSuback = do
-   getReplies 9 (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [] @?= ([(9, pack $ [0x90, 3, 0, 7, 0])] :: [Reply Int])
-   getReplies 11 (pack [0x8c, 7, 0, 8, 0, 1, char 'f', 2]) [] @?= ([(11, pack $ [0x90, 3, 0, 8, 0])] :: [Reply Int])
-   getReplies 6 (pack [0x8c, 11, 0, 13, 0, 1, char 'f', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
-                  ([(6, pack $ [0x90, 4, 0, 13, 0, 0])] :: [Reply Int])
+   handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [] @?=
+                     (["f"], [(9, pack $ [0x90, 3, 0, 7, 0])])
+   handleRequest (11::Int) (pack [0x8c, 7, 0, 8, 0, 1, char 'f', 2]) [] @?=
+                     (["f"], [(11, pack $ [0x90, 3, 0, 8, 0])])
+   handleRequest (6::Int) (pack [0x8c, 11, 0, 13, 0, 1, char 'f', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
+                  (["f"], [(6, pack $ [0x90, 4, 0, 13, 0, 0])])
+
+
+testSubscribe :: Assertion
+testSubscribe = do
+  handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) ["thingie"] @?=
+                   (["thingie", "f"], [(9, pack $ [0x90, 3, 0, 7, 0])])
+  handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) ["foo", "bar"] @?=
+                   (["foo", "bar", "f"], [(9, pack $ [0x90, 3, 0, 7, 0])])
+  handleRequest (9::Int) (pack [0x8c, 8, 0, 7, 0, 3, char 'f', char 'o', char 'o', 2]) [] @?=
+                   (["foo"], [(9, pack $ [0x90, 3, 0, 7, 0])])
+
 
 
 testPublish = testGroup "Publish" [ testCase "No msgs for no subs" testNoMsgWithNoSubs
@@ -82,15 +96,15 @@ publishMsg :: BS.ByteString
 publishMsg = pack $ [0x30, 5, 0, 3] ++ map (fromIntegral . ord) "foo"
 
 testNoMsgWithNoSubs :: Assertion
-testNoMsgWithNoSubs = getReplies 7 publishMsg [] @?= ([] :: [Reply Int])
+testNoMsgWithNoSubs = handleRequest (7::Int) publishMsg [] @?= ([], [])
 
 testOneMsgWithExactSub :: Assertion
-testOneMsgWithExactSub = getReplies 4 publishMsg ["foo"] @?= ([(4, publishMsg)] :: [Reply Int])
+testOneMsgWithExactSub = handleRequest (4::Int) publishMsg ["foo"] @?= (["foo"], [(4, publishMsg)])
 
 testOneMsgWithWrongSub :: Assertion
-testOneMsgWithWrongSub = getReplies 3 publishMsg ["bar"] @?= ([] :: [Reply Int])
+testOneMsgWithWrongSub = handleRequest (3::Int) publishMsg ["bar"] @?= (["bar"], [])
 
 testOneMsgWithTwoSubs :: Assertion
 testOneMsgWithTwoSubs = do
-  getReplies (1 :: Int) publishMsg ["foo", "bar"] @?= [(1, publishMsg)]
-  getReplies (2 :: Int) publishMsg ["baz", "boo"] @?= []
+  handleRequest (1 :: Int) publishMsg ["foo", "bar"] @?= (["foo", "bar"], [(1, publishMsg)])
+  handleRequest (2 :: Int) publishMsg ["baz", "boo"] @?= (["baz", "boo"], [])
