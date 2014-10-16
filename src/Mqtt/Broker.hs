@@ -18,7 +18,7 @@ import Data.ByteString (uncons, pack, unpack)
 import Data.Binary.Strict.Get
 import Data.Bits (shiftR, (.&.))
 import Data.Word (Word8, Word16)
-import Data.Char (ord, chr)
+import Data.Char (chr)
 
 
 type Topic = String
@@ -59,42 +59,35 @@ handlePublish handle pkt subs = let topic = getPublishTopic pkt in
 
 
 getPublishTopic :: BS.ByteString -> String
-getPublishTopic pkt = stringFromEither $ runGet publishTopicGetter pkt
-
+getPublishTopic pkt = let result = fst (runGet publishTopicGetter pkt) in
+                      either (\_ -> "") id result
 
 publishTopicGetter :: Get String
-publishTopicGetter = do
-  remainingLengthGetter
-  publishTopicGetterInner
+publishTopicGetter = remainingLengthGetter >> getWord16be >>= getString
 
-publishTopicGetterInner :: Get String
-publishTopicGetterInner = do
-  topicLen <- getWord16be
-  fmap (map (chr . fromIntegral) . unpack) (getByteString $ fromIntegral topicLen)
+getString :: (Integral n) => n -> Get String
+getString strLen = fmap byteStringToString (getByteString $ fromIntegral strLen)
 
-stringFromEither :: (Either String String, b) -> String
-stringFromEither (Left _, _) = ""
-stringFromEither (Right x, _) = x
-
-stringsFromEither :: (Either String [String], b) -> [String]
-stringsFromEither (Left _, _) = [""]
-stringsFromEither (Right x, _) = x
-
+byteStringToString :: BS.ByteString -> String
+byteStringToString = map (chr . fromIntegral) . unpack
 
 getSubscriptionTopics :: BS.ByteString -> [String]
-getSubscriptionTopics pkt = stringsFromEither $ runGet subscriptionTopicsGetter pkt
+getSubscriptionTopics pkt = let result = fst (runGet subscriptionTopicsGetter pkt) in
+                            either (\_ -> [""]) id result
 
 subscriptionTopicsGetter :: Get [String]
 subscriptionTopicsGetter = do
   len <- remainingLengthGetter
   getWord16be -- msgId
-  publishTopicGetterInner' (len - 2) -- -2 because of msgId
+  let len' = len - 2 -- subtract msgId length
+  subscriptionTopicsGetterInner len'
 
-publishTopicGetterInner' :: Int -> Get [String]
-publishTopicGetterInner' 0 = return []
-publishTopicGetterInner' numBytes = do
+subscriptionTopicsGetterInner :: Int -> Get [String]
+subscriptionTopicsGetterInner 0 = return []
+subscriptionTopicsGetterInner numBytes = do
   topicLen <- getWord16be
-  str <- fmap (map (chr . fromIntegral) . unpack) (getByteString $ fromIntegral topicLen)
+  str <- getString topicLen
   getWord8 -- qos
-  strs <- publishTopicGetterInner' (numBytes - fromIntegral topicLen - 3) -- -2 because of str len & qos
+  let numBytes' = (numBytes - fromIntegral topicLen - 3) -- -2 because of str len & qos
+  strs <- subscriptionTopicsGetterInner numBytes'
   return $ [str] ++ strs
