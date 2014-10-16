@@ -43,11 +43,12 @@ testDecodeMqttConnect = handleRequest (3::Int) request [] @?= ([], [(3, pack [32
 
 testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe message" testSubackTwoTopics
                                    , testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic
-                                   , testCase "Test MQTT reply for SUBSCRIBE" testGetSuback
+                                   , testCase "Test MQTT SUBACK reply for SUBSCRIBE" testGetSuback
                                    , testCase "Test subscribe" testSubscribe
                                    ]
 testSubackTwoTopics :: Assertion
-testSubackTwoTopics = handleRequest (4::Int) request [] @?= (["first", "foo"], [(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])])
+testSubackTwoTopics = handleRequest (4::Int) request [] @?= (["first", "foo"],
+                                                             [(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])])
                     where request = pack $ [0x8c, 0x10, -- fixed header
                                             0x00, 0x21, -- message ID
                                             0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
@@ -69,10 +70,10 @@ testGetSuback :: Assertion
 testGetSuback = do
    handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [] @?=
                      (["f"], [(9, pack $ [0x90, 3, 0, 7, 0])])
-   handleRequest (11::Int) (pack [0x8c, 7, 0, 8, 0, 1, char 'f', 2]) [] @?=
-                     (["f"], [(11, pack $ [0x90, 3, 0, 8, 0])])
-   handleRequest (6::Int) (pack [0x8c, 11, 0, 13, 0, 1, char 'f', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
-                  (["f"], [(6, pack $ [0x90, 4, 0, 13, 0, 0])])
+   handleRequest (11::Int) (pack [0x8c, 6, 0, 8, 0, 1, char 'g', 2]) [] @?=
+                     (["g"], [(11, pack $ [0x90, 3, 0, 8, 0])])
+   handleRequest (6::Int) (pack [0x8c, 11, 0, 13, 0, 1, char 'h', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
+                  (["h", "ab"], [(6, pack $ [0x90, 4, 0, 13, 0, 0])])
 
 
 testSubscribe :: Assertion
@@ -90,6 +91,7 @@ testPublish = testGroup "Publish" [ testCase "No msgs for no subs" testNoMsgWith
                                   , testCase "One msg for exact sub" testOneMsgWithExactSub
                                   , testCase "One msg with wrong sub" testOneMsgWithWrongSub
                                   , testCase "One msg with two subs" testOneMsgWithTwoSubs
+                                  , testCase "Anothe msg with exact sub" testAnotherMsgWithExactSub
                                   ]
 
 publishMsg :: BS.ByteString
@@ -108,3 +110,11 @@ testOneMsgWithTwoSubs :: Assertion
 testOneMsgWithTwoSubs = do
   handleRequest (1 :: Int) publishMsg ["foo", "bar"] @?= (["foo", "bar"], [(1, publishMsg)])
   handleRequest (2 :: Int) publishMsg ["baz", "boo"] @?= (["baz", "boo"], [])
+
+
+testAnotherMsgWithExactSub :: Assertion
+testAnotherMsgWithExactSub = do
+  handleRequest (5 :: Int) myPublish ["/foo/bar"] @?= (["/foo/bar"], [(5, myPublish)])
+                where myPublish = pack $ [0x30, 16, 0, 8] ++
+                                  (map (fromIntegral . ord) "/foo/bar") ++
+                                  (map (fromIntegral . ord) "ohnoes")

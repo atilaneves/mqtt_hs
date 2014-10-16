@@ -124,7 +124,6 @@ Then(/^I should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |
   end
 end
 
-
 When(/^I successfully subscribe to topic "(.*?)"$/) do |topic|
   subscribe(topic, msg_id)
   recv_suback(msg_id)

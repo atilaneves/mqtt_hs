@@ -21,28 +21,28 @@ socketHandler socket = do
     (handle, _, _) <- accept socket
     hSetBinaryMode handle True
     let rest = empty
-    forkIO $ handleConnection handle rest
+    forkIO $ handleConnection handle rest []
     socketHandler socket
 
 
-handleConnection :: Handle -> BS.ByteString -> IO ()
-handleConnection handle rest = do
+handleConnection :: Handle -> BS.ByteString -> [Subscription] -> IO ()
+handleConnection handle rest subs = do
   pkt <- readBytes handle rest
-  rest' <- handlePacket handle pkt []
-  handleConnection handle rest'
+  (rest', subs') <- handlePacket handle pkt subs
+  handleConnection handle rest' subs'
 
 readBytes :: Handle -> BS.ByteString -> IO BS.ByteString
 readBytes handle oldBytes = do
   newBytes <- hGetSome handle 1024
   return $ oldBytes `append` newBytes
 
-handlePacket :: Handle -> BS.ByteString -> [Subscription] -> IO BS.ByteString
+handlePacket :: Handle -> BS.ByteString -> [Subscription] -> IO (BS.ByteString, [Subscription])
 handlePacket handle pkt subs = do
   let (request, rest) = nextMessage pkt
   let (subs', replies) = handleRequest handle request subs
   handleReplies replies
   if BS.null rest
-      then return rest
+      then return (rest, subs')
       else handlePacket handle rest subs'
 
 

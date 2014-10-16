@@ -38,9 +38,9 @@ handleRequest handle packet subs = case getMessageType packet of
 
 
 getSubackReply :: a -> BS.ByteString -> Subscriptions -> RequestResult a
-getSubackReply handle pkt subs = (subs ++ [topic],
+getSubackReply handle pkt subs = (subs ++ topics,
                                   [(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)])
-    where topic = getSubscriptionTopic pkt
+    where topics = getSubscriptionTopics pkt
           fixedHeader = 0x90
           msgId = serialise $ fromIntegral (getSubscriptionMsgId pkt)
           qoss = take (getNumTopics pkt) (repeat 0)
@@ -54,7 +54,7 @@ serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 handlePublish :: a -> BS.ByteString -> Subscriptions -> RequestResult a
 handlePublish handle pkt subs = let topic = getPublishTopic pkt in
                                 if topic `elem` subs
-                                then (subs, [(handle, pack $ [0x30, 5, 0, 3] ++ map (fromIntegral . ord) topic)])
+                                then (subs, [(handle, pkt)])
                                 else (subs, [])
 
 
@@ -65,21 +65,36 @@ getPublishTopic pkt = stringFromEither $ runGet publishTopicGetter pkt
 publishTopicGetter :: Get String
 publishTopicGetter = do
   remainingLengthGetter
+  publishTopicGetterInner
+
+publishTopicGetterInner :: Get String
+publishTopicGetterInner = do
   topicLen <- getWord16be
   fmap (map (chr . fromIntegral) . unpack) (getByteString $ fromIntegral topicLen)
-
 
 stringFromEither :: (Either String String, b) -> String
 stringFromEither (Left _, _) = ""
 stringFromEither (Right x, _) = x
 
+stringsFromEither :: (Either String [String], b) -> [String]
+stringsFromEither (Left _, _) = [""]
+stringsFromEither (Right x, _) = x
 
-getSubscriptionTopic :: BS.ByteString -> String
-getSubscriptionTopic pkt = stringFromEither $ runGet subscriptionTopicGetter pkt
 
-subscriptionTopicGetter :: Get String
-subscriptionTopicGetter = do
-  remainingLengthGetter
+getSubscriptionTopics :: BS.ByteString -> [String]
+getSubscriptionTopics pkt = stringsFromEither $ runGet subscriptionTopicsGetter pkt
+
+subscriptionTopicsGetter :: Get [String]
+subscriptionTopicsGetter = do
+  len <- remainingLengthGetter
   getWord16be -- msgId
+  publishTopicGetterInner' (len - 2) -- -2 because of msgId
+
+publishTopicGetterInner' :: Int -> Get [String]
+publishTopicGetterInner' 0 = return []
+publishTopicGetterInner' numBytes = do
   topicLen <- getWord16be
-  fmap (map (chr . fromIntegral) . unpack) (getByteString $ fromIntegral topicLen)
+  str <- fmap (map (chr . fromIntegral) . unpack) (getByteString $ fromIntegral topicLen)
+  getWord8 -- qos
+  strs <- publishTopicGetterInner' (numBytes - fromIntegral topicLen - 3) -- -2 because of str len & qos
+  return $ [str] ++ strs
