@@ -120,7 +120,7 @@ testAnotherMsgWithExactSub = do
 
 testTwoClients :: Assertion
 testTwoClients = do
-  handleRequest (5 :: Int) myPublish subscriptions @?= (subscriptions, [(3, myPublish)])
+  handleRequest (5 :: Int) myPublish subscriptions @?= (subscriptions, [(5, myPublish)])
                  where subscriptions = [("/foo/bar", 5), ("/bar/foo", 3)]
                        myPublish = pack $ [0x30, 16, 0, 8] ++
                                    (map (fromIntegral . ord) "/foo/bar") ++

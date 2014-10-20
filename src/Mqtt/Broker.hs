@@ -33,7 +33,7 @@ handleRequest _ (uncons -> Nothing) subs = (subs, [])  -- 1st _ is xs, 2nd subsc
 handleRequest handle packet subs = case getMessageType packet of
     Connect -> (subs, [(handle, pack [32, 2, 0, 0])]) -- connect gets connack
     Subscribe -> getSubackReply handle packet subs
-    Publish -> handlePublish handle packet subs
+    Publish -> handlePublish packet subs
     _ -> ([], [])
 
 
@@ -51,16 +51,14 @@ serialise :: Word16 -> [Word8]
 serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 
 
-handlePublish :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
-handlePublish handle pkt subs = let topic = getPublishTopic pkt in
-                                if haveSubscriptionFor topic subs
-                                then (subs, [(handle, pkt)])
-                                else (subs, [])
+handlePublish :: BS.ByteString -> Subscriptions a -> RequestResult a
+handlePublish pkt subs = let topic = getPublishTopic pkt
+                             matchingSubs = filter (\s -> subscriptionMatches topic (fst s)) subs
+                             handles = map snd matchingSubs in
+                         (subs, map (\h -> (h, pkt)) handles)
 
-haveSubscriptionFor :: String -> Subscriptions a -> Bool
-haveSubscriptionFor topic subs = if topic `elem` (map fst subs)
-                                 then True
-                                 else False
+subscriptionMatches :: String -> String -> Bool
+subscriptionMatches topic sub = topic == sub
 
 
 getPublishTopic :: BS.ByteString -> String
