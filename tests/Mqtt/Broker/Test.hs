@@ -9,7 +9,6 @@ import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (
                     handleRequest
-                   , Reply
                    )
 
 
