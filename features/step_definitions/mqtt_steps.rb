@@ -2,9 +2,21 @@ require 'socket'
 require 'timeout'
 require 'rspec-expectations'
 
+class MqttServer
+  def initialize
+    @proc = IO.popen('dist/build/mqtt_hs/mqtt_hs')
+  end
+
+  def finalize
+    unless @proc.nil?
+      Process.kill('QUIT', @proc.pid)
+      Process.wait(@proc.pid)
+    end
+  end
+end
+
 class MqttClient
   def initialize(port = 1883)
-    @mqtt = IO.popen('dist/build/mqtt_hs/mqtt_hs')
     Timeout.timeout(1) do
       while @socket.nil?
         begin
@@ -18,10 +30,6 @@ class MqttClient
 
   def finalize
     @socket.nil? || @socket.close
-    unless @mqtt.nil?
-      Process.kill('QUIT', @mqtt.pid)
-      Process.wait(@mqtt.pid)
-    end
   end
 
   def send_bytes(bytes)
@@ -31,10 +39,38 @@ class MqttClient
   def assert_recv(bytes)
     @socket.recv(bytes.length).unpack('C*').should == bytes
   end
+
+  def subscribe(topic, msg_id, qos = 0)
+    send_bytes [0x8c, 5 + topic.length, # fixed header
+                0, msg_id, # message ID
+                0, topic.length] + string_to_ints(topic)  + [qos]
+  end
+
+  def recv_suback(msg_id, qos = 0)
+    assert_recv [0x90, 3, 0, msg_id.to_i, qos.to_i]
+  end
+
+  def successfully_subscribe(topic, msg_id, qos = 0)
+    subscribe(topic, msg_id, qos)
+    recv_suback(msg_id, qos)
+  end
+
+  def expect_mqtt_publish(topic, payload)
+    Timeout.timeout(1) do
+      remaining_length = topic.length + 2 + payload.length
+      assert_recv [0x30, remaining_length, 0, topic.length] + \
+      string_to_ints(topic) + string_to_ints(payload)
+    end
+  end
+end
+
+Before do
+  @mqtt = MqttServer.new
 end
 
 After do
   @clients.each { |c| c.finalize }
+  @mqtt.finalize
 end
 
 def connect_to_broker_tcp(port = 1883)
@@ -89,22 +125,14 @@ Given(/^I have connected to the broker on port (\d+)$/) do |port|
   connect_to_broker_mqtt(port)
 end
 
-def subscribe(topic, msg_id, qos = 0)
-  send_bytes [0x8c, 5 + topic.length, # fixed header
-              0, msg_id, # message ID
-              0, topic.length] + string_to_ints(topic)  + [qos]
-end
 
 When(/^I subscribe to one topic with msgId (\d+)$/) do |msg_id|
-  subscribe('topic', msg_id.to_i)
+  @clients[0].subscribe('topic', msg_id.to_i)
 end
 
-def recv_suback(msg_id, qos = 0)
-  assert_recv [0x90, 3, 0, msg_id.to_i, qos.to_i]
-end
 
 Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |qos, msg_id|
-  recv_suback(msg_id.to_i, qos.to_i)
+  @clients[0].recv_suback(msg_id.to_i, qos.to_i)
 end
 
 When(/^I publish on topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
@@ -135,28 +163,25 @@ When(/^I subscribe to topic "(.*?)"$/) do |topic|
   msg_id += 1
 end
 
+
+
 Then(/^I should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
-  Timeout.timeout(1) do
-    remaining_length = topic.length + 2 + payload.length
-    assert_recv [0x30, remaining_length, 0, topic.length] + \
-      string_to_ints(topic) + string_to_ints(payload)
-  end
+  @clients[0].expect_mqtt_publish(topic, payload)
 end
 
 When(/^I successfully subscribe to topic "(.*?)"$/) do |topic|
-  subscribe(topic, msg_id)
-  recv_suback(msg_id)
+  @clients[0].successfully_subscribe(topic, msg_id)
 end
 
 
 Given(/^another client has connected to the broker on port (\d+)$/) do |port|
-  pending # express the regexp above with the code you wish you had
+  connect_to_broker_tcp(port)
 end
 
-When(/^the other client successfully subscribes to topicarg1, arg2 "(.*?)"$/) do |topic|
-  pending # express the regexp above with the code you wish you had
+When(/^the other client successfully subscribes to topic "(.*?)"$/) do |topic|
+  @clients[1].successfully_subscribe(topic, msg_id)
 end
 
 Then(/^the other client should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
-  pending # express the regexp above with the code you wish you had
+  @clients[1].expect_mqtt_publish(topic, payload)
 end
