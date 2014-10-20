@@ -2,29 +2,48 @@ require 'socket'
 require 'timeout'
 require 'rspec-expectations'
 
-After do
-  @socket.nil? || @socket.close
-  unless @mqtt.nil?
-    Process.kill('QUIT', @mqtt.pid)
-    Process.wait(@mqtt.pid)
-  end
-end
-
-def connect_to_broker_tcp(port = 1883)
-  @mqtt = IO.popen('dist/build/mqtt_hs/mqtt_hs')
-  Timeout.timeout(1) do
-    while @socket.nil?
-      begin
-        @socket = TCPSocket.new('localhost', port)
-      rescue Errno::ECONNREFUSED
-        # keep trying until the server is up or we time out
+class MqttClient
+  def initialize(port = 1883)
+    @mqtt = IO.popen('dist/build/mqtt_hs/mqtt_hs')
+    Timeout.timeout(1) do
+      while @socket.nil?
+        begin
+          @socket = TCPSocket.new('localhost', port)
+        rescue Errno::ECONNREFUSED
+          # keep trying until the server is up or we time out
+        end
       end
     end
   end
+
+  def finalize
+    @socket.nil? || @socket.close
+    unless @mqtt.nil?
+      Process.kill('QUIT', @mqtt.pid)
+      Process.wait(@mqtt.pid)
+    end
+  end
+
+  def send_bytes(bytes)
+    @socket.sendmsg(bytes.pack('C*'))
+  end
+
+  def assert_recv(bytes)
+    @socket.recv(bytes.length).unpack('C*').should == bytes
+  end
 end
 
-def send_bytes(bytes)
-  @socket.sendmsg(bytes.pack('C*'))
+After do
+  @clients.each { |c| c.finalize }
+end
+
+def connect_to_broker_tcp(port = 1883)
+  @clients ||= []
+  @clients << MqttClient.new(port)
+end
+
+def send_bytes(bytes, client = @clients[0])
+  client.send_bytes(bytes)
 end
 
 def send_mqtt_connect
@@ -48,8 +67,8 @@ When(/^I send a CONNECT MQTT message$/) do
   send_mqtt_connect
 end
 
-def assert_recv(bytes)
-  @socket.recv(bytes.length).unpack('C*').should == bytes
+def assert_recv(bytes, client = @clients[0])
+  client.assert_recv(bytes)
 end
 
 def expect_mqtt_connack
@@ -127,4 +146,17 @@ end
 When(/^I successfully subscribe to topic "(.*?)"$/) do |topic|
   subscribe(topic, msg_id)
   recv_suback(msg_id)
+end
+
+
+Given(/^another client has connected to the broker on port (\d+)$/) do |port|
+  pending # express the regexp above with the code you wish you had
+end
+
+When(/^the other client successfully subscribes to topicarg1, arg2 "(.*?)"$/) do |topic|
+  pending # express the regexp above with the code you wish you had
+end
+
+Then(/^the other client should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
+  pending # express the regexp above with the code you wish you had
 end
