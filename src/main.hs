@@ -25,7 +25,7 @@ socketHandler socket = do
     socketHandler socket
 
 
-handleConnection :: Handle -> BS.ByteString -> [Subscription] -> IO ()
+handleConnection :: Handle -> BS.ByteString -> [Subscription Handle] -> IO ()
 handleConnection handle rest subs = do
   pkt <- readBytes handle rest
   (rest', subs') <- handlePacket handle pkt subs
@@ -36,7 +36,7 @@ readBytes handle oldBytes = do
   newBytes <- hGetSome handle 1024
   return $ oldBytes `append` newBytes
 
-handlePacket :: Handle -> BS.ByteString -> [Subscription] -> IO (BS.ByteString, [Subscription])
+handlePacket :: Handle -> BS.ByteString -> [Subscription Handle] -> IO (BS.ByteString, [Subscription Handle])
 handlePacket handle pkt subs = do
   let (request, rest) = nextMessage pkt
   let (subs', replies) = handleRequest handle request subs

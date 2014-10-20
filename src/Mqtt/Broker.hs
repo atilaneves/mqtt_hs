@@ -22,13 +22,13 @@ import Data.Char (chr)
 
 
 type Topic = String
-type Subscription = Topic
-type Subscriptions = [Subscription]
+type Subscription a = (Topic, a)
+type Subscriptions a = [Subscription a]
 type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in real life)
-type RequestResult a = (Subscriptions, [Reply a])
+type RequestResult a = (Subscriptions a, [Reply a])
 
 
-handleRequest :: a -> BS.ByteString -> Subscriptions -> RequestResult a
+handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
 handleRequest _ (uncons -> Nothing) subs = (subs, [])  -- 1st _ is xs, 2nd subscriptions
 handleRequest handle packet subs = case getMessageType packet of
     Connect -> (subs, [(handle, pack [32, 2, 0, 0])]) -- connect gets connack
@@ -37,8 +37,8 @@ handleRequest handle packet subs = case getMessageType packet of
     _ -> ([], [])
 
 
-getSubackReply :: a -> BS.ByteString -> Subscriptions -> RequestResult a
-getSubackReply handle pkt subs = (subs ++ topics,
+getSubackReply :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
+getSubackReply handle pkt subs = (subs ++ (map (\t -> (t, handle)) topics),
                                   [(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)])
     where topics = getSubscriptionTopics pkt
           fixedHeader = 0x90
@@ -51,11 +51,16 @@ serialise :: Word16 -> [Word8]
 serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 
 
-handlePublish :: a -> BS.ByteString -> Subscriptions -> RequestResult a
+handlePublish :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
 handlePublish handle pkt subs = let topic = getPublishTopic pkt in
-                                if topic `elem` subs
+                                if haveSubscriptionFor topic subs
                                 then (subs, [(handle, pkt)])
                                 else (subs, [])
+
+haveSubscriptionFor :: String -> Subscriptions a -> Bool
+haveSubscriptionFor topic subs = if topic `elem` (map fst subs)
+                                 then True
+                                 else False
 
 
 getPublishTopic :: BS.ByteString -> String
