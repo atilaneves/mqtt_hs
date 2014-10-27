@@ -58,6 +58,7 @@ handleReplies :: [Reply Handle] -> IO ()
 handleReplies [] = return ()
 handleReplies replies = do
   hPutStr replyHandle replyPacket
+  handleReplies (tail replies)
     where reply = head replies
           replyHandle = fst reply
           replyPacket = snd reply

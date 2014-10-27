@@ -176,3 +176,11 @@ end
 Then(/^the other client should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
   @clients[1].expect_mqtt_publish(topic, payload)
 end
+
+When(/^the third client successfully subscribes to topic "(.*?)"$/) do |topic|
+  @clients[2].successfully_subscribe(topic, msg_id)
+end
+
+Then(/^the third client should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
+  @clients[2].expect_mqtt_publish(topic, payload)
+end
