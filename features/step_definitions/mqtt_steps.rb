@@ -9,6 +9,7 @@ class MqttServer
 
   def finalize
     unless @proc.nil?
+      #puts @proc.readlines
       Process.kill('QUIT', @proc.pid)
       Process.wait(@proc.pid)
     end

@@ -27,6 +27,7 @@ executable mqtt_hs
                      , binary-strict >= 0.4.8.1
                      , bytestring
                      , network
+                     , stm
 
 Test-suite test-mqtt
   main-is: ut.hs

@@ -20,5 +20,5 @@ Feature: Publish
     When I successfully subscribe to topic "/foo/bar"
     And the other client successfully subscribes to topic "/bar/foo"
     When I publish on topic "/bar/foo" with payload "hello"
-    Then I should not receive any messages
-    And the other client should receive a message with topic "/bar/foo" and payload "ohnoes"
+    Then the other client should receive a message with topic "/bar/foo" and payload "hello"
+    And I should not receive any messages
