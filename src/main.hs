@@ -4,9 +4,7 @@ import Network
 import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode)
 import qualified Data.ByteString as BS
-import Data.ByteString (hPutStr, hGetSome, append, empty, unpack)
-import Control.Concurrent.STM
--- import Control.Concurrent.MVar.Strict
+import Data.ByteString (hPutStr, hGetSome, append, empty)
 import Mqtt.Broker (handleRequest, Reply, Subscription)
 import Mqtt.Stream (nextMessage)
 
@@ -44,28 +42,13 @@ readBytes handle bytes = do
 
 handlePacket :: Handle -> BS.ByteString -> Subscriptions -> IO BS.ByteString
 handlePacket handle pkt subsVar = do
-  putStrLn $ "Got a packet"
   let (request, rest) = nextMessage pkt
-  putStrLn $ "Got the request and the rest. Request is " ++ show (unpack request)
+
   modifyMVar_ subsVar $ \subs -> do
-    putStrLn $ "In the modify"
     let (subs', replies) = handleRequest handle request subs
     handleReplies replies
     return subs'
-  -- mysubs <- takeMVar subsVar
-  -- let (subs', replies) = handleRequest handle request mysubs
-  -- handleReplies replies
-  -- putMVar subsVar subs'
-  -- putStrLn $ "After the modify"
 
-  -- atomically $ do
-  --   subs <- readTVar subsVar
-  --   let (subs', replies) = handleRequest handle request subs
-  --   -- handleReplies replies
-  --   writeTVar subsVar subs'
-
-  -- repr <- takeMVar subsVar
-  --putStrLn $ "New subscriptions: " ++ show repr
   if BS.null rest
   then return rest
   else handlePacket handle rest subsVar
@@ -74,7 +57,6 @@ handlePacket handle pkt subsVar = do
 handleReplies :: [Reply Handle] -> IO ()
 handleReplies [] = return ()
 handleReplies replies = do
-  putStrLn $ "Handling replies " ++ show (map (\r -> (fst r, unpack $ snd r)) replies)
   hPutStr replyHandle replyPacket
     where reply = head replies
           replyHandle = fst reply
