@@ -15,4 +15,4 @@ nextMessage pkt = if containsFullMessage pkt
 -- This returns true if there is at least one full message in the byte stream
 containsFullMessage :: BS.ByteString -> Bool
 containsFullMessage pkt = let size = getRemainingLength pkt in
-                          size > 0 && BS.length pkt >= size
+                          size >= 0 && BS.length pkt >= size

@@ -2,9 +2,9 @@ module Main where
 
 import Network
 import Control.Concurrent
-import System.IO (Handle, hSetBinaryMode)
+import System.IO (Handle, hSetBinaryMode, hClose)
 import qualified Data.ByteString as BS
-import Data.ByteString (hPutStr, hGetSome, append, empty)
+import Data.ByteString (hPutStr, hGetSome, append, empty, pack)
 import Mqtt.Broker (handleRequest, Reply, Subscription)
 import Mqtt.Stream (nextMessage)
 
@@ -22,36 +22,40 @@ main = withSocketsDo $ do
 
 socketHandler :: Subscriptions -> Socket -> IO ThreadId
 socketHandler subs socket = do
-    (handle, _, _) <- accept socket
-    hSetBinaryMode handle True
-    let rest = empty
-    forkIO $ handleConnection handle rest subs
-    socketHandler subs socket
+  (handle, _, _) <- accept socket
+  hSetBinaryMode handle True
+  let rest = empty
+  forkIO $ handleConnection handle rest subs
+  socketHandler subs socket
 
 
 handleConnection :: Handle -> BS.ByteString -> Subscriptions -> IO ()
 handleConnection handle bytes subs = do
   pkt <- readBytes handle bytes
-  bytes' <- handlePacket handle pkt subs
-  handleConnection handle bytes' subs
+  let (msg, pkt') = nextMessage pkt
+  if msg == pack [0xe0, 0]
+  then hClose handle
+  else do
+    bytes' <- handlePacket handle msg pkt' subs
+    handleConnection handle bytes' subs
 
 readBytes :: Handle -> BS.ByteString -> IO BS.ByteString
 readBytes handle bytes = do
   bytes' <- hGetSome handle 1024
   return $ bytes `append` bytes'
 
-handlePacket :: Handle -> BS.ByteString -> Subscriptions -> IO BS.ByteString
-handlePacket handle pkt subsVar = do
-  let (request, rest) = nextMessage pkt
+handlePacket :: Handle -> BS.ByteString -> BS.ByteString -> Subscriptions -> IO BS.ByteString
+handlePacket handle msg rest subsVar = do
 
   modifyMVar_ subsVar $ \subs -> do
-    let (subs', replies) = handleRequest handle request subs
+    let (subs', replies) = handleRequest handle msg subs
     handleReplies replies
     return subs'
 
   if BS.null rest
   then return rest
-  else handlePacket handle rest subsVar
+  else handlePacket handle msg' rest' subsVar
+       where (msg', rest') = nextMessage rest
 
 
 handleReplies :: [Reply Handle] -> IO ()

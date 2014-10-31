@@ -38,7 +38,10 @@ getMessageType (uncons -> Just (msgType, _)) = toEnum $ (fromIntegral msgType) `
 
 
 getRemainingLength :: BS.ByteString -> Int
-getRemainingLength pkt = fromEither $ runGet remainingLengthGetter pkt
+getRemainingLength pkt = let (result, _) = runGet remainingLengthGetter pkt in
+                         case result of
+                           Left _ -> -1
+                           Right x -> x
 
 remainingLengthGetter :: Get Int
 remainingLengthGetter = do

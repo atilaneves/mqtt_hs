@@ -15,6 +15,7 @@ testStream = testGroup "TCP Streams" [ testCase "Test 0 bytes" testNoBytes
                                      , testCase "Test only connect header" testOnlyConnectHeader
                                      , testCase "Test only connect message" testOnlyConnectMsg
                                      , testCase "Test connect msg + garbage" testConnectMsgThenGarbage
+                                     , testCase "Test disconnect msg" testDisconnectMsg
                                      ]
 
 
@@ -57,3 +58,8 @@ testOnlyConnectMsg = nextMessage subscribeMsg @?= (subscribeMsg, emptyByteStr)
 testConnectMsgThenGarbage :: Assertion
 testConnectMsgThenGarbage = nextMessage (subscribeMsg `append` garbage) @?= (subscribeMsg, garbage)
     where garbage = pack [1, 2, 3]
+
+
+testDisconnectMsg :: Assertion
+testDisconnectMsg = nextMessage disconnectMsg @?= (disconnectMsg, emptyByteStr)
+    where disconnectMsg = pack [0xe0, 0]

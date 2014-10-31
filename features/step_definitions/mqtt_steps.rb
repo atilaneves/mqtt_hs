@@ -32,6 +32,10 @@ class MqttClient
     @socket.nil? || @socket.close
   end
 
+  def recv(num_bytes)
+    @socket.recvfrom(num_bytes)
+  end
+
   def send_bytes(bytes)
     @socket.sendmsg(bytes.pack('C*'))
   end
@@ -183,4 +187,12 @@ end
 
 Then(/^the third client should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |topic, payload|
   @clients[2].expect_mqtt_publish(topic, payload)
+end
+
+When(/^I send a DISCONNECT MQTT message$/) do
+  @clients[0].send_bytes [0xe0, 0]
+end
+
+Then(/^the server should close the connection$/) do
+  @clients[0].recv(10).should == ['', nil]
 end
