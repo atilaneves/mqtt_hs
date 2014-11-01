@@ -81,7 +81,7 @@ byteStringToString = map (chr . fromIntegral) . unpack
 
 getSubscriptionTopics :: BS.ByteString -> [String]
 getSubscriptionTopics pkt = let result = fst (runGet subscriptionTopicsGetter pkt) in
-                            either (\_ -> [""]) id result
+                            either (const [""]) id result
 
 subscriptionTopicsGetter :: Get [String]
 subscriptionTopicsGetter = do
