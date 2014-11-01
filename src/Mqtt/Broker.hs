@@ -11,7 +11,7 @@ import Mqtt.Message ( getMessageType
                     , getSubscriptionMsgId
                     , getNumTopics
                     , remainingLengthGetter
-                    , MqttType(Connect, Subscribe, Publish)
+                    , MqttType(Connect, Subscribe, Publish, PingReq)
                     )
 import qualified Data.ByteString as BS
 import Data.ByteString (uncons, pack, unpack)
@@ -34,6 +34,7 @@ handleRequest handle packet subs = case getMessageType packet of
     Connect -> (subs, [(handle, pack [32, 2, 0, 0])]) -- connect gets connack
     Subscribe -> getSubackReply handle packet subs
     Publish -> handlePublish packet subs
+    PingReq -> (subs, [(handle, pack [0xd0, 0])]) -- ping gets pong
     _ -> ([], [])
 
 

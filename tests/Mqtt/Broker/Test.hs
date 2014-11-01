@@ -1,4 +1,4 @@
-module Mqtt.Broker.Test (testConnack, testSuback, testPublish) where
+module Mqtt.Broker.Test (testConnack, testSuback, testPublish, testPing) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -125,3 +125,12 @@ testTwoClients = do
                        myPublish = pack $ [0x30, 16, 0, 8] ++
                                    (map (fromIntegral . ord) "/foo/bar") ++
                                    (map (fromIntegral . ord) "ohnoes")
+
+testPing = testGroup "Ping" [ testCase "Ping" testPingImpl]
+
+testPingImpl :: Assertion
+testPingImpl = do
+  handleRequest (3 :: Int) ping subscriptions @?= (subscriptions, [(3, pong)])
+                where subscriptions = [("/path/to", 3)]
+                      ping = pack [0xc0, 0]
+                      pong = pack [0xd0, 0]

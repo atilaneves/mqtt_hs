@@ -1,7 +1,7 @@
 module Mqtt.Message (getMessageType,
                      getSubscriptionMsgId,
                      getNumTopics,
-                     MqttType(Connect, ConnAck, Subscribe, Publish),
+                     MqttType(Connect, ConnAck, Subscribe, Publish, PingReq),
                      remainingLengthGetter,
                      getRemainingLength) where
 

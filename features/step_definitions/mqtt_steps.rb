@@ -62,8 +62,16 @@ class MqttClient
      0x00, 0x02, 'p'.ord, 'w'.ord] # password
   end
 
+  def send_mqtt_ping_req
+    send_bytes [0xc0, 0]
+  end
+
   def expect_mqtt_connack
     assert_recv [0x20, 0x2, 0x0, 0x0]
+  end
+
+  def expect_mqtt_ping_resp
+    assert_recv [0xd0, 0]
   end
 
   def subscribe(topic, msg_id, qos = 0)
@@ -195,4 +203,12 @@ end
 
 Then(/^the server should close the connection$/) do
   @clients[0].recv(10).should == ['', nil]
+end
+
+When(/^I send a PINGREQ MQTT message$/) do
+  @clients[0].send_mqtt_ping_req
+end
+
+Then(/^I should receive a PINGREQP MQTT message$/) do
+  @clients[0].expect_mqtt_ping_resp
 end
