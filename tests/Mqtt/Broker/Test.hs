@@ -1,4 +1,8 @@
-module Mqtt.Broker.Test (testConnack, testSuback, testPublish, testPing) where
+module Mqtt.Broker.Test (testConnack
+                        , testSuback
+                        , testPublish
+                        , testWildcards
+                        , testPing) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -9,6 +13,7 @@ import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (
                     handleRequest
+                   , topicMatches
                    )
 
 
@@ -134,3 +139,24 @@ testPingImpl = do
                 where subscriptions = [("/path/to", 3)]
                       ping = pack [0xc0, 0]
                       pong = pack [0xd0, 0]
+
+testWildcards = testGroup "Wildcards" [ testCase "Wildcard +" testWildcardPlus]
+
+testWildcardPlus :: Assertion
+testWildcardPlus = do
+  topicMatches "foo/bar/baz" "foo/bar/baz" @?= True
+  topicMatches "foo/bar" "foo/+" @?= True
+  topicMatches "foo/baz" "foo/+" @?= True
+  topicMatches "foo/bar/baz" "foo/+" @?= False
+  topicMatches "foo/bar" "foo/#" @?= True
+  topicMatches "foo/bar/baz" "bar/#" @?= False
+  topicMatches "topics/bar/baz/boo" "topics/foo/#" @?= False
+  topicMatches "foo/bar/baz" "foo/#" @?= True
+  topicMatches "foo/bar/baz/boo" "foo/#" @?= True
+  topicMatches "foo/bla/bar/baz/boo/bogadog" "foo/+/bar/baz/#" @?= True
+  topicMatches "finance" "finance/#" @?= True
+  topicMatches "finance" "finance#" @?= False
+  topicMatches "finance" "#" @?= True
+  topicMatches "finance/stock" "#" @?= True
+  topicMatches "finance/stock" "finance/stock/ibm" @?= False
+  topicMatches "topics/foo/bar" "topics/foo/#" @?= True

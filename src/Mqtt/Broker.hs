@@ -5,6 +5,7 @@ module Mqtt.Broker (
                    , Subscriptions
                    , getNumTopics
                    , handleRequest
+                   , topicMatches
                    ) where
 
 import Mqtt.Message ( getMessageType
@@ -19,7 +20,7 @@ import Data.Binary.Strict.Get
 import Data.Bits (shiftR, (.&.))
 import Data.Word (Word8, Word16)
 import Data.Char (chr)
-
+import Data.List.Split (splitOn)
 
 type Topic = String
 type Subscription a = (Topic, a)
@@ -58,12 +59,9 @@ serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 
 handlePublish :: BS.ByteString -> Subscriptions a -> RequestResult a
 handlePublish pkt subs = let topic = getPublishTopic pkt
-                             matchingSubs = filter (\s -> subscriptionMatches topic (fst s)) subs
+                             matchingSubs = filter (\s -> topicMatches topic (fst s)) subs
                              handles = map snd matchingSubs in
                          (subs, map (\h -> (h, pkt)) handles)
-
-subscriptionMatches :: String -> String -> Bool
-subscriptionMatches topic sub = topic == sub
 
 
 getPublishTopic :: BS.ByteString -> String
@@ -99,3 +97,23 @@ subscriptionTopicsGetterInner numBytes = do
   let numBytes' = (numBytes - fromIntegral topicLen - 3) -- -2 because of str len & qos
   strs <- subscriptionTopicsGetterInner numBytes'
   return $ [str] ++ strs
+
+
+topicMatches :: String -> String -> Bool
+topicMatches pub sub
+    | pub == sub = True
+    | otherwise = allPartsMatch pubElts subElts
+    where pubElts = splitOn "/" pub
+          subElts = splitOn "/" sub
+
+
+allPartsMatch :: [String] -> [String] -> Bool
+allPartsMatch pubElts subElts = let results = zipWith partMatches pubElts subElts
+                                in
+                                if (length subElts) > 0 && last subElts == "#"
+                                then allPartsMatch (take (length pubElts - 1) pubElts) (take (length pubElts - 1) subElts)
+                                else length pubElts == length subElts && all (==True) results
+
+-- whether a part of a topic matches, including the + wildcard
+partMatches :: String -> String -> Bool
+partMatches pubElt subElt = pubElt == subElt || subElt == "+"

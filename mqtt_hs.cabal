@@ -27,6 +27,7 @@ executable mqtt_hs
                      , binary-strict >= 0.4.8.1
                      , bytestring
                      , network
+                     , split >= 0.2.2
 
 Test-suite test-mqtt
   main-is: ut.hs
@@ -40,3 +41,4 @@ Test-suite test-mqtt
                , test-framework-hunit
                , bytestring
                , binary-strict >= 0.4.8.1
+               , split >= 0.2.2

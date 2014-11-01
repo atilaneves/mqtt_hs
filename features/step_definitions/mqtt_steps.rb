@@ -141,10 +141,14 @@ Then(/^I should receive a SUBACK message with qos (\d+) and msgId (\d+)$/) do |q
   @clients[0].recv_suback(msg_id.to_i, qos.to_i)
 end
 
-When(/^I publish on topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
+def publish(client, topic, payload)
   remaining_length = topic.length + 2 + payload.length
-  @clients[0].send_bytes [0x30, remaining_length, 0, topic.length] + \
+  client.send_bytes [0x30, remaining_length, 0, topic.length] + \
     string_to_ints(topic) + string_to_ints(payload)
+end
+
+When(/^I publish on topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
+  publish(@clients[0], topic, payload)
 end
 
 def string_to_ints(str)
@@ -211,4 +215,12 @@ end
 
 Then(/^I should receive a PINGREQP MQTT message$/) do
   @clients[0].expect_mqtt_ping_resp
+end
+
+When(/^the other client publishes on topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
+  publish(@clients[1], topic, payload)
+end
+
+Then(/^I should receive a message with topic "(.*?)" with payload "(.*?)"$/) do |topic, payload|
+  @clients[0].expect_mqtt_publish(topic, payload)
 end
