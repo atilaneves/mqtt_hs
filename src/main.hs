@@ -7,14 +7,15 @@ import qualified Data.ByteString as BS
 import Data.ByteString (hPutStr, hGetSome, append, empty, pack)
 import Mqtt.Broker (handleRequest, Reply, Subscription)
 import Mqtt.Stream (nextMessage)
+import Control.Concurrent.STM;
 
 
 type SubscriptionIO = Subscription Handle
-type Subscriptions = MVar [Subscription Handle]
+type Subscriptions = TVar [Subscription Handle]
 
 main :: IO ()
 main = withSocketsDo $ do
-         subs <- newMVar [] -- empty subscriptions list
+         subs <- atomically $ newTVar [] -- empty subscriptions list
          socket <- listenOn $ PortNumber 1883
          socketHandler subs socket
          return ()
@@ -47,10 +48,12 @@ readBytes handle bytes = do
 handlePacket :: Handle -> BS.ByteString -> BS.ByteString -> Subscriptions -> IO BS.ByteString
 handlePacket handle msg rest subsVar = do
 
-  modifyMVar_ subsVar $ \subs -> do
-    let (subs', replies) = handleRequest handle msg subs
-    handleReplies replies
-    return subs'
+  replies <- atomically $ do
+               subs <- readTVar subsVar
+               let (subs', replies) = handleRequest handle msg subs
+               writeTVar subsVar subs'
+               return replies
+  handleReplies replies
 
   if BS.null rest
   then return rest
