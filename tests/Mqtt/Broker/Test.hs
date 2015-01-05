@@ -2,7 +2,8 @@ module Mqtt.Broker.Test (testConnack
                         , testSuback
                         , testPublish
                         , testWildcards
-                        , testPing) where
+                        , testPing
+                        , testInfiniteMessages) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -14,6 +15,7 @@ import Data.Word (Word8)
 import Mqtt.Broker (
                     handleRequest
                    , topicMatches
+                   , serviceRequests
                    )
 
 
@@ -160,3 +162,17 @@ testWildcardPlus = do
   topicMatches "finance/stock" "#" @?= True
   topicMatches "finance/stock" "finance/stock/ibm" @?= False
   topicMatches "topics/foo/bar" "topics/foo/#" @?= True
+
+
+testInfiniteMessages = testGroup "Infinite message list" [ testCase "empty" testEmptyMessages
+                                                         , testCase "one" testOneMessage]
+
+testEmptyMessages :: Assertion
+testEmptyMessages = serviceRequests (4 :: Int) [] subscriptions @?= []
+                    where subscriptions = [("/path/to", 4)]
+
+
+testOneMessage :: Assertion
+testOneMessage = serviceRequests handle [publishMsg] subscriptions @?= [(subscriptions, [(handle, publishMsg)])]
+                 where handle = 4 :: Int
+                       subscriptions = [("foo", handle)]

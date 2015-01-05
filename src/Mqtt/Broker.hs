@@ -6,6 +6,7 @@ module Mqtt.Broker (
                    , getNumTopics
                    , handleRequest
                    , topicMatches
+                   , serviceRequests
                    ) where
 
 import Mqtt.Message ( getMessageType
@@ -27,6 +28,10 @@ type Subscription a = (Topic, a)
 type Subscriptions a = [Subscription a]
 type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in real life)
 type RequestResult a = (Subscriptions a, [Reply a])
+
+
+serviceRequests :: a -> [BS.ByteString] -> Subscriptions a -> [RequestResult a]
+serviceRequests handle msgs subs = map (\m -> handleRequest handle m subs) msgs
 
 
 handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
