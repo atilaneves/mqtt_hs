@@ -6,3 +6,11 @@ Feature: Disconnect
     Given I have connected to the broker on port 1883
     When I send a DISCONNECT MQTT message
     Then the server should close the connection
+
+  Scenario: Disconnect with one subscription
+    Given I have connected to the broker on port 1883
+    When I successfully subscribe to topic "/foo/bar"
+    And I publish on topic "/foo/bar" with payload "ohnoes"
+    Then I should receive a message with topic "/foo/bar" and payload "ohnoes"
+    When I send a DISCONNECT MQTT message
+    Then the server should close the connection
