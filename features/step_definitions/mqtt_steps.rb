@@ -1,6 +1,6 @@
 require 'socket'
 require 'timeout'
-require 'rspec-expectations'
+require 'rspec'
 
 class MqttServer
   def initialize
