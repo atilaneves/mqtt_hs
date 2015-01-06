@@ -165,14 +165,49 @@ testWildcardPlus = do
 
 
 testInfiniteMessages = testGroup "Infinite message list" [ testCase "empty" testEmptyMessages
-                                                         , testCase "one" testOneMessage]
+                                                         , testCase "No msgs for no subs" testNoMsgWithNoSubs'
+                                                         , testCase "1msg exact sub" testOneMessageWithExactSub'
+                                                         , testCase "One msg with wrong sub" testOneMsgWithWrongSub'
+                                                         , testCase "One msg with two subs" testOneMsgWithTwoSubs'
+                                                         , testCase "Another msg with exact sub" testAnotherMsgWithExactSub'
+                                                         , testCase "Two clients" testTwoClients']
+
 
 testEmptyMessages :: Assertion
 testEmptyMessages = serviceRequests (4 :: Int) [] subscriptions @?= []
                     where subscriptions = [("/path/to", 4)]
 
+testNoMsgWithNoSubs' :: Assertion
+testNoMsgWithNoSubs' = serviceRequests (7::Int) [publishMsg] [] @?= [([], [])]
 
-testOneMessage :: Assertion
-testOneMessage = serviceRequests handle [publishMsg] subscriptions @?= [(subscriptions, [(handle, publishMsg)])]
-                 where handle = 4 :: Int
-                       subscriptions = [("foo", handle)]
+
+testOneMessageWithExactSub' :: Assertion
+testOneMessageWithExactSub' = do
+  serviceRequests handle [publishMsg] subscriptions @?= [(subscriptions, [(handle, publishMsg)])]
+      where handle = 4 :: Int
+            subscriptions = [("foo", handle)]
+
+testOneMsgWithWrongSub' :: Assertion
+testOneMsgWithWrongSub' = serviceRequests (3::Int) [publishMsg] [("bar", 2)] @?= [([("bar", 2)], [])]
+
+testOneMsgWithTwoSubs' :: Assertion
+testOneMsgWithTwoSubs' = do
+  serviceRequests (1 :: Int) [publishMsg] [("foo", 1), ("bar", 2)] @?= [([("foo", 1), ("bar", 2)],
+                                                                         [(1, publishMsg)])]
+  serviceRequests (2 :: Int) [publishMsg] [("baz", 3), ("boo", 3)] @?= [([("baz", 3), ("boo", 3)], [])]
+
+
+testAnotherMsgWithExactSub' :: Assertion
+testAnotherMsgWithExactSub' = do
+  serviceRequests (5 :: Int) [myPublish] [("/foo/bar", 5)] @?= [([("/foo/bar", 5)], [(5, myPublish)])]
+                where myPublish = pack $ [0x30, 16, 0, 8] ++
+                                  (map (fromIntegral . ord) "/foo/bar") ++
+                                  (map (fromIntegral . ord) "ohnoes")
+
+testTwoClients' :: Assertion
+testTwoClients' = do
+  serviceRequests (5 :: Int) [myPublish] subscriptions @?= [(subscriptions, [(5, myPublish)])]
+                 where subscriptions = [("/foo/bar", 5), ("/bar/foo", 3)]
+                       myPublish = pack $ [0x30, 16, 0, 8] ++
+                                   (map (fromIntegral . ord) "/foo/bar") ++
+                                   (map (fromIntegral . ord) "ohnoes")
