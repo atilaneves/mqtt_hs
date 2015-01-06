@@ -51,9 +51,10 @@ char x = (fromIntegral $ ord x) :: Word8
 
 -- Test that we get a MQTT CONNACK in reply to a CONNECT message
 testDecodeMqttConnect :: Assertion
-testDecodeMqttConnect = serviceRequest handle request subs @?= ClientMessages ([(3, pack [32, 2, 0, 0])], subs)
+testDecodeMqttConnect = serviceRequest handle request subs @?= ClientMessages ([(handle, connack)], subs)
                            where handle = 3 :: Int
                                  subs = []
+                                 connack = pack [32, 2, 0, 0]
                                  request = pack $ [0x10, 0x2a, -- fixed header
                                                    0x00, 0x06] ++
                                           [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p'] ++
@@ -63,8 +64,9 @@ testDecodeMqttConnect = serviceRequest handle request subs @?= ClientMessages ([
                                            0x00, 0x03, char 'c', char 'i', char 'd', -- client ID
                                            0x00, 0x04, char 'w', char 'i', char 'l', char 'l', -- will topic
                                            0x00, 0x04, char 'w', char 'm', char 's', char 'g', -- will msg
-                                           0x00, 0x07,
-                                           char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l', --username
+                                           0x00, 0x07, -- size of username
+                                           -- username
+                                           char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l',
                                            0x00, 0x02, char 'p', char 'w'] --password
 
 
@@ -75,9 +77,11 @@ testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe m
                                    , testCase "Test subscribe" testSubscribe
                                    ]
 testSubackTwoTopics :: Assertion
-testSubackTwoTopics = handleRequest (4::Int) request [] @?= ([("first", 4), ("foo", 4)],
-                                                             [(4, pack [0x90, 0x04, 0x00, 0x21, 0, 0])])
-                    where request = pack $ [0x8c, 0x10, -- fixed header
+testSubackTwoTopics = serviceRequest handle request [] @?=
+                      ClientMessages ([(handle, pack [0x90, 0x04, 0x00, 0x21, 0, 0])],
+                                      [("first", handle), ("foo", handle)])
+                    where handle = 4 :: Int
+                          request = pack $ [0x8c, 0x10, -- fixed header
                                             0x00, 0x21, -- message ID
                                             0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
                                             0x01, -- qos
@@ -86,7 +90,9 @@ testSubackTwoTopics = handleRequest (4::Int) request [] @?= ([("first", 4), ("fo
                                             ]
 
 testSubackOneTopic :: Assertion
-testSubackOneTopic = handleRequest (7::Int) request [] @?= ([("first", 7)], [(7, pack [0x90, 0x03, 0x00, 0x33, 0])])
+testSubackOneTopic = serviceRequest (7::Int) request [] @?=
+                     ClientMessages ([(7, pack [0x90, 0x03, 0x00, 0x33, 0])],
+                                     [("first", 7)])
                      where request = pack $ [0x8c, 10, -- fixed header
                                              0, 0x33, -- message ID
                                              0, 5, char 'f', char 'i', char 'r', char 's', char 't',
@@ -96,22 +102,22 @@ testSubackOneTopic = handleRequest (7::Int) request [] @?= ([("first", 7)], [(7,
 
 testGetSuback :: Assertion
 testGetSuback = do
-   handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [] @?=
-                     ([("f", 9)], [(9, pack $ [0x90, 3, 0, 7, 0])])
-   handleRequest (11::Int) (pack [0x8c, 6, 0, 8, 0, 1, char 'g', 2]) [] @?=
-                     ([("g", 11)], [(11, pack $ [0x90, 3, 0, 8, 0])])
-   handleRequest (6::Int) (pack [0x8c, 11, 0, 13, 0, 1, char 'h', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
-                  ([("h", 6), ("ab", 6)], [(6, pack $ [0x90, 4, 0, 13, 0, 0])])
+   serviceRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [] @?=
+                     ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("f", 9)])
+   serviceRequest (11::Int) (pack [0x8c, 6, 0, 8, 0, 1, char 'g', 2]) [] @?=
+                     ClientMessages ([(11, pack $ [0x90, 3, 0, 8, 0])], [("g", 11)])
+   serviceRequest (6::Int) (pack [0x8c, 11, 0, 13, 0, 1, char 'h', 1, 0, 2, char 'a', char 'b', 2]) [] @?=
+                  ClientMessages ([(6, pack $ [0x90, 4, 0, 13, 0, 0])], [("h", 6), ("ab", 6)])
 
 
 testSubscribe :: Assertion
 testSubscribe = do
-  handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [("thingie", 1)] @?=
-                   ([("thingie", 1), ("f", 9)], [(9, pack $ [0x90, 3, 0, 7, 0])])
-  handleRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [("foo", 1), ("bar", 2)] @?=
-                   ([("foo", 1), ("bar", 2), ("f", 9)], [(9, pack $ [0x90, 3, 0, 7, 0])])
-  handleRequest (9::Int) (pack [0x8c, 8, 0, 7, 0, 3, char 'f', char 'o', char 'o', 2]) [] @?=
-                   ([("foo", 9)], [(9, pack $ [0x90, 3, 0, 7, 0])])
+  serviceRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [("thingie", 1)] @?=
+                   ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("thingie", 1), ("f", 9)])
+  serviceRequest (9::Int) (pack [0x8c, 6, 0, 7, 0, 1, char 'f', 2]) [("foo", 1), ("bar", 2)] @?=
+                   ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("foo", 1), ("bar", 2), ("f", 9)])
+  serviceRequest (9::Int) (pack [0x8c, 8, 0, 7, 0, 3, char 'f', char 'o', char 'o', 2]) [] @?=
+                   ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("foo", 9)])
 
 
 testPublish = testGroup "Publish" [ testCase "No msgs for no subs" testNoMsgWithNoSubs

@@ -42,16 +42,28 @@ data Response a = CloseConnection | ClientMessages (RequestResult a)
 serviceRequest :: a -> BS.ByteString -> Subscriptions a -> Response a
 serviceRequest handle msg subs = case getMessageType msg of
                            Connect -> simpleReply [32, 2, 0, 0]
+                           Subscribe -> getSubackReply handle msg subs
                            Disconnect -> CloseConnection
                            _ -> ClientMessages ([], [])
     where simpleReply reply = ClientMessages ([(handle, pack reply)], subs)
+
+getSubackReply :: a -> BS.ByteString -> Subscriptions a -> Response a
+getSubackReply handle msg subs =
+    ClientMessages ([(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)],
+                    subs ++ (map (\t -> (t, handle)) topics))
+    where topics = getSubscriptionTopics msg
+          fixedHeader = 0x90
+          msgId = serialise $ fromIntegral (getSubscriptionMsgId msg)
+          qoss = take (getNumTopics msg) (repeat 0)
+          remainingLength = fromIntegral $ (length qoss) + (length msgId)
+
 
 
 handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
 handleRequest _ (uncons -> Nothing) subs = (subs, [])  -- 1st _ is xs, 2nd subscriptions
 handleRequest handle packet subs = case getMessageType packet of
     Connect -> simpleReply' handle subs [32, 2, 0, 0]
-    Subscribe -> getSubackReply handle packet subs
+    Subscribe -> getSubackReply' handle packet subs
     Publish -> handlePublish packet subs
     PingReq -> simpleReply' handle subs [0xd0, 0]
     _ -> ([], [])
@@ -61,8 +73,8 @@ simpleReply' :: a -> Subscriptions a -> [Word8] -> RequestResult' a
 simpleReply' handle subs reply = (subs, [(handle, pack reply)])
 
 
-getSubackReply :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
-getSubackReply handle pkt subs = (subs ++ (map (\t -> (t, handle)) topics),
+getSubackReply' :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
+getSubackReply' handle pkt subs = (subs ++ (map (\t -> (t, handle)) topics),
                                   [(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)])
     where topics = getSubscriptionTopics pkt
           fixedHeader = 0x90
