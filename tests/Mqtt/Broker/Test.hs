@@ -2,20 +2,32 @@ module Mqtt.Broker.Test (testConnack
                         , testSuback
                         , testPublish
                         , testWildcards
+                        , testDisconnect
                         , testPing) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString (pack)
+import Data.ByteString (pack, empty)
 import qualified Data.ByteString as BS
 import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (
                     handleRequest
                    , topicMatches
-                   , serviceRequests
+                   , serviceRequest
+                   , Response(CloseConnection, ClientMessages)
                    )
+
+
+testDisconnect = testGroup "Disconnect"
+                 [testCase "No messages" testEmptyDisconnect
+                 ]
+
+testEmptyDisconnect :: Assertion
+testEmptyDisconnect = serviceRequest handle empty subs @?= ClientMessages (subs, [])
+                      where handle = (7::Int)
+                            subs = []
 
 
 testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" testDecodeMqttConnect

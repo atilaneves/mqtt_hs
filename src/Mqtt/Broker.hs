@@ -6,14 +6,15 @@ module Mqtt.Broker (
                    , getNumTopics
                    , handleRequest
                    , topicMatches
-                   , serviceRequests
+                   , serviceRequest
+                   , Response(CloseConnection, ClientMessages)
                    ) where
 
 import Mqtt.Message ( getMessageType
                     , getSubscriptionMsgId
                     , getNumTopics
                     , remainingLengthGetter
-                    , MqttType(Connect, Subscribe, Publish, PingReq)
+                    , MqttType(Connect, Subscribe, Publish, PingReq, Disconnect)
                     )
 import qualified Data.ByteString as BS
 import Data.ByteString (uncons, pack, unpack)
@@ -27,14 +28,22 @@ type Topic = String
 type Subscription a = (Topic, a)
 type Subscriptions a = [Subscription a]
 type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in real life)
-type RequestResult a = (Subscriptions a, [Reply a])
+type RequestResult' a = (Subscriptions a, [Reply a])
+
+-- a RequestResult is the list of (handle, bytes )replies to send to clients
+-- and the state (a list of subscriptions)
+-- The reason why all of this is polymorphic is to enable easy testing instead
+-- of using real System.IO.Handle in the tests, we can use Ints instead
+type RequestResult a = ([Reply a], Subscriptions a)
+data Response a = CloseConnection | ClientMessages (RequestResult a)
+                  deriving (Show, Eq)
 
 
-serviceRequests :: a -> [BS.ByteString] -> Subscriptions a -> [RequestResult a]
-serviceRequests handle msgs subs = map (\m -> handleRequest handle m subs) msgs
+serviceRequest :: a -> BS.ByteString -> Subscriptions a -> Response a
+serviceRequest _ _ _ = ClientMessages ([], [])
 
 
-handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
+handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
 handleRequest _ (uncons -> Nothing) subs = (subs, [])  -- 1st _ is xs, 2nd subscriptions
 handleRequest handle packet subs = case getMessageType packet of
     Connect -> simpleReply handle subs [32, 2, 0, 0]
@@ -44,11 +53,11 @@ handleRequest handle packet subs = case getMessageType packet of
     _ -> ([], [])
 
 -- convenience function to simply return a fixed sequence of bytes
-simpleReply :: a -> Subscriptions a -> [Word8] -> RequestResult a
+simpleReply :: a -> Subscriptions a -> [Word8] -> RequestResult' a
 simpleReply handle subs reply = (subs, [(handle, pack reply)])
 
 
-getSubackReply :: a -> BS.ByteString -> Subscriptions a -> RequestResult a
+getSubackReply :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
 getSubackReply handle pkt subs = (subs ++ (map (\t -> (t, handle)) topics),
                                   [(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)])
     where topics = getSubscriptionTopics pkt
@@ -62,7 +71,7 @@ serialise :: Word16 -> [Word8]
 serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 
 
-handlePublish :: BS.ByteString -> Subscriptions a -> RequestResult a
+handlePublish :: BS.ByteString -> Subscriptions a -> RequestResult' a
 handlePublish pkt subs = let topic = getPublishTopic pkt
                              matchingSubs = filter (\s -> topicMatches topic (fst s)) subs
                              handles = map snd matchingSubs in
