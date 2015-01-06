@@ -5,6 +5,7 @@ import qualified Data.ByteString as BS
 import Data.ByteString (pack, unpack)
 
 
+-- Takes a packet and returns the next MQTT message and the remaining bytes
 nextMessage :: BS.ByteString -> (BS.ByteString, BS.ByteString)
 nextMessage pkt = if containsFullMessage pkt
                   then (pack $ take size (unpack pkt), pack $ drop size (unpack pkt))

@@ -5,7 +5,7 @@ import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode, hClose)
 import qualified Data.ByteString as BS
 import Data.ByteString (hPutStr, hGetSome, append, empty, pack)
-import Mqtt.Broker (handleRequest, Reply, Subscription)
+import Mqtt.Broker (serviceRequest, Reply, Subscription, Response(ClientMessages))
 import Mqtt.Stream (nextMessage)
 import Control.Concurrent.STM;
 
@@ -50,7 +50,7 @@ handlePacket handle msg rest subsVar = do
 
   replies <- atomically $ do
                subs <- readTVar subsVar
-               let (subs', replies) = handleRequest handle msg subs
+               let ClientMessages (replies, subs') = serviceRequest handle msg subs
                writeTVar subsVar subs'
                return replies
   handleReplies replies

@@ -6,7 +6,6 @@ module Mqtt.Broker (
                    , getNumTopics
                    , topicMatches
                    , serviceRequest
-                   , handleRequest
                    , Response(CloseConnection, ClientMessages)
                    ) where
 
@@ -27,8 +26,8 @@ import Data.List.Split (splitOn)
 type Topic = String
 type Subscription a = (Topic, a)
 type Subscriptions a = [Subscription a]
-type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in real life)
-type RequestResult' a = (Subscriptions a, [Reply a])
+type Reply a = (a, BS.ByteString) -- a is a handle type (socket handle in prod, Int in UTs)
+
 
 -- a RequestResult is the list of (handle, bytes )replies to send to clients
 -- and the state (a list of subscriptions)
@@ -39,9 +38,6 @@ data Response a = CloseConnection | ClientMessages (RequestResult a)
                   deriving (Show, Eq)
 
 
-handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
-handleRequest handle msg subs = (subs', replies)
-    where ClientMessages (replies, subs') = serviceRequest handle msg subs
 
 serviceRequest :: a -> BS.ByteString -> Subscriptions a -> Response a
 serviceRequest handle msg subs = case getMessageType msg of
