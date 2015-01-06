@@ -40,23 +40,25 @@ data Response a = CloseConnection | ClientMessages (RequestResult a)
 
 
 serviceRequest :: a -> BS.ByteString -> Subscriptions a -> Response a
-serviceRequest _ msg _ = case getMessageType msg of
+serviceRequest handle msg subs = case getMessageType msg of
+                           Connect -> simpleReply [32, 2, 0, 0]
                            Disconnect -> CloseConnection
                            _ -> ClientMessages ([], [])
+    where simpleReply reply = ClientMessages ([(handle, pack reply)], subs)
 
 
 handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
 handleRequest _ (uncons -> Nothing) subs = (subs, [])  -- 1st _ is xs, 2nd subscriptions
 handleRequest handle packet subs = case getMessageType packet of
-    Connect -> simpleReply handle subs [32, 2, 0, 0]
+    Connect -> simpleReply' handle subs [32, 2, 0, 0]
     Subscribe -> getSubackReply handle packet subs
     Publish -> handlePublish packet subs
-    PingReq -> simpleReply handle subs [0xd0, 0]
+    PingReq -> simpleReply' handle subs [0xd0, 0]
     _ -> ([], [])
 
 -- convenience function to simply return a fixed sequence of bytes
-simpleReply :: a -> Subscriptions a -> [Word8] -> RequestResult' a
-simpleReply handle subs reply = (subs, [(handle, pack reply)])
+simpleReply' :: a -> Subscriptions a -> [Word8] -> RequestResult' a
+simpleReply' handle subs reply = (subs, [(handle, pack reply)])
 
 
 getSubackReply :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a

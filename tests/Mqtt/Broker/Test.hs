@@ -8,7 +8,7 @@ module Mqtt.Broker.Test (testConnack
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString (pack, empty)
+import Data.ByteString (pack, empty, append)
 import qualified Data.ByteString as BS
 import Data.Char (ord)
 import Data.Word (Word8)
@@ -38,6 +38,8 @@ testOnlyOneDisconnect = serviceRequest handle disconnectMsg subs @?= CloseConnec
                         where handle = 5 :: Int
                               subs = []
 
+
+
 testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" testDecodeMqttConnect
                                   ]
 
@@ -49,8 +51,10 @@ char x = (fromIntegral $ ord x) :: Word8
 
 -- Test that we get a MQTT CONNACK in reply to a CONNECT message
 testDecodeMqttConnect :: Assertion
-testDecodeMqttConnect = handleRequest (3::Int) request [] @?= ([], [(3, pack [32, 2, 0, 0])])
-                           where request = pack $ [0x10, 0x2a, -- fixed header
+testDecodeMqttConnect = serviceRequest handle request subs @?= ClientMessages ([(3, pack [32, 2, 0, 0])], subs)
+                           where handle = 3 :: Int
+                                 subs = []
+                                 request = pack $ [0x10, 0x2a, -- fixed header
                                                    0x00, 0x06] ++
                                           [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p'] ++
                                           [0x03, -- protocol version
