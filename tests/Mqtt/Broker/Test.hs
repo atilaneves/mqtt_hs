@@ -100,8 +100,11 @@ testPublish = testGroup "Publish" [ testCase "No msgs for no subs" testNoMsgWith
                                   , testCase "Two clients" testTwoClients
                                   ]
 
+strToBytes :: Num a => String -> [a]
+strToBytes = map (fromIntegral . ord)
+
 publishMsg :: BS.ByteString
-publishMsg = pack $ [0x30, 5, 0, 3] ++ map (fromIntegral . ord) "foo"
+publishMsg = pack $ [0x30, 5, 0, 3] ++ strToBytes "foo"
 
 testNoMsgWithNoSubs :: Assertion
 testNoMsgWithNoSubs = handleRequest (7::Int) publishMsg [] @?= ([], [])
@@ -122,16 +125,16 @@ testAnotherMsgWithExactSub :: Assertion
 testAnotherMsgWithExactSub = do
   handleRequest (5 :: Int) myPublish [("/foo/bar", 5)] @?= ([("/foo/bar", 5)], [(5, myPublish)])
                 where myPublish = pack $ [0x30, 16, 0, 8] ++
-                                  (map (fromIntegral . ord) "/foo/bar") ++
-                                  (map (fromIntegral . ord) "ohnoes")
+                                  strToBytes "/foo/bar" ++
+                                  strToBytes "ohnoes"
 
 testTwoClients :: Assertion
 testTwoClients = do
   handleRequest (5 :: Int) myPublish subscriptions @?= (subscriptions, [(5, myPublish)])
                  where subscriptions = [("/foo/bar", 5), ("/bar/foo", 3)]
                        myPublish = pack $ [0x30, 16, 0, 8] ++
-                                   (map (fromIntegral . ord) "/foo/bar") ++
-                                   (map (fromIntegral . ord) "ohnoes")
+                                   strToBytes "/foo/bar" ++
+                                   strToBytes "ohnoes"
 
 testPing = testGroup "Ping" [ testCase "Ping" testPingImpl]
 
@@ -201,13 +204,13 @@ testAnotherMsgWithExactSub' :: Assertion
 testAnotherMsgWithExactSub' = do
   serviceRequests (5 :: Int) [myPublish] [("/foo/bar", 5)] @?= [([("/foo/bar", 5)], [(5, myPublish)])]
                 where myPublish = pack $ [0x30, 16, 0, 8] ++
-                                  (map (fromIntegral . ord) "/foo/bar") ++
-                                  (map (fromIntegral . ord) "ohnoes")
+                                  strToBytes "/foo/bar" ++
+                                  strToBytes "ohnoes"
 
 testTwoClients' :: Assertion
 testTwoClients' = do
   serviceRequests (5 :: Int) [myPublish] subscriptions @?= [(subscriptions, [(5, myPublish)])]
                  where subscriptions = [("/foo/bar", 5), ("/bar/foo", 3)]
                        myPublish = pack $ [0x30, 16, 0, 8] ++
-                                   (map (fromIntegral . ord) "/foo/bar") ++
-                                   (map (fromIntegral . ord) "ohnoes")
+                                   strToBytes "/foo/bar" ++
+                                   strToBytes "ohnoes"
