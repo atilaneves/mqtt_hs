@@ -40,7 +40,9 @@ data Response a = CloseConnection | ClientMessages (RequestResult a)
 
 
 serviceRequest :: a -> BS.ByteString -> Subscriptions a -> Response a
-serviceRequest _ _ _ = ClientMessages ([], [])
+serviceRequest _ msg _ = case getMessageType msg of
+                           Disconnect -> CloseConnection
+                           _ -> ClientMessages ([], [])
 
 
 handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a

@@ -21,14 +21,22 @@ import Mqtt.Broker (
 
 
 testDisconnect = testGroup "Disconnect"
-                 [testCase "No messages" testEmptyDisconnect
+                 [ testCase "No messages" testEmptyDisconnect
+                 , testCase "One disconnect" testOnlyOneDisconnect
                  ]
 
 testEmptyDisconnect :: Assertion
 testEmptyDisconnect = serviceRequest handle empty subs @?= ClientMessages (subs, [])
-                      where handle = (7::Int)
+                      where handle = 7 :: Int
                             subs = []
 
+disconnectMsg :: BS.ByteString
+disconnectMsg = pack [0xe0, 0] -- MQTT disconnect in bytes
+
+testOnlyOneDisconnect :: Assertion
+testOnlyOneDisconnect = serviceRequest handle disconnectMsg subs @?= CloseConnection
+                        where handle = 5 :: Int
+                              subs = []
 
 testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" testDecodeMqttConnect
                                   ]
