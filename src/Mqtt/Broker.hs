@@ -4,9 +4,9 @@ module Mqtt.Broker (
                    , Subscription
                    , Subscriptions
                    , getNumTopics
-                   , handleRequest
                    , topicMatches
                    , serviceRequest
+                   , handleRequest
                    , Response(CloseConnection, ClientMessages)
                    ) where
 
@@ -17,7 +17,7 @@ import Mqtt.Message ( getMessageType
                     , MqttType(Connect, Subscribe, Publish, PingReq, Disconnect)
                     )
 import qualified Data.ByteString as BS
-import Data.ByteString (uncons, pack, unpack)
+import Data.ByteString (pack, unpack)
 import Data.Binary.Strict.Get
 import Data.Bits (shiftR, (.&.))
 import Data.Word (Word8, Word16)
@@ -39,10 +39,16 @@ data Response a = CloseConnection | ClientMessages (RequestResult a)
                   deriving (Show, Eq)
 
 
+handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
+handleRequest handle msg subs = (subs', replies)
+    where ClientMessages (replies, subs') = serviceRequest handle msg subs
+
 serviceRequest :: a -> BS.ByteString -> Subscriptions a -> Response a
 serviceRequest handle msg subs = case getMessageType msg of
                            Connect -> simpleReply [32, 2, 0, 0]
                            Subscribe -> getSubackReply handle msg subs
+                           Publish -> handlePublish msg subs
+                           PingReq -> simpleReply [0xd0, 0]
                            Disconnect -> CloseConnection
                            _ -> ClientMessages ([], [])
     where simpleReply reply = ClientMessages ([(handle, pack reply)], subs)
@@ -59,39 +65,15 @@ getSubackReply handle msg subs =
 
 
 
-handleRequest :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
-handleRequest _ (uncons -> Nothing) subs = (subs, [])  -- 1st _ is xs, 2nd subscriptions
-handleRequest handle packet subs = case getMessageType packet of
-    Connect -> simpleReply' handle subs [32, 2, 0, 0]
-    Subscribe -> getSubackReply' handle packet subs
-    Publish -> handlePublish packet subs
-    PingReq -> simpleReply' handle subs [0xd0, 0]
-    _ -> ([], [])
-
--- convenience function to simply return a fixed sequence of bytes
-simpleReply' :: a -> Subscriptions a -> [Word8] -> RequestResult' a
-simpleReply' handle subs reply = (subs, [(handle, pack reply)])
-
-
-getSubackReply' :: a -> BS.ByteString -> Subscriptions a -> RequestResult' a
-getSubackReply' handle pkt subs = (subs ++ (map (\t -> (t, handle)) topics),
-                                  [(handle, pack $ [fixedHeader, remainingLength] ++ msgId ++ qoss)])
-    where topics = getSubscriptionTopics pkt
-          fixedHeader = 0x90
-          msgId = serialise $ fromIntegral (getSubscriptionMsgId pkt)
-          qoss = take (getNumTopics pkt) (repeat 0)
-          remainingLength = fromIntegral $ (length qoss) + (length msgId)
-
-
 serialise :: Word16 -> [Word8]
 serialise x = map fromIntegral [ x `shiftR` 8, x .&. 0x00ff]
 
 
-handlePublish :: BS.ByteString -> Subscriptions a -> RequestResult' a
+handlePublish :: BS.ByteString -> Subscriptions a -> Response a
 handlePublish pkt subs = let topic = getPublishTopic pkt
                              matchingSubs = filter (\s -> topicMatches topic (fst s)) subs
                              handles = map snd matchingSubs in
-                         (subs, map (\h -> (h, pkt)) handles)
+                         ClientMessages (map (\h -> (h, pkt)) handles, subs)
 
 
 getPublishTopic :: BS.ByteString -> String

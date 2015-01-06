@@ -8,13 +8,12 @@ module Mqtt.Broker.Test (testConnack
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString (pack, empty, append)
+import Data.ByteString (pack, empty)
 import qualified Data.ByteString as BS
 import Data.Char (ord)
 import Data.Word (Word8)
 import Mqtt.Broker (
-                    handleRequest
-                   , topicMatches
+                   topicMatches
                    , serviceRequest
                    , Response(CloseConnection, ClientMessages)
                    )
@@ -135,30 +134,33 @@ publishMsg :: BS.ByteString
 publishMsg = pack $ [0x30, 5, 0, 3] ++ strToBytes "foo"
 
 testNoMsgWithNoSubs :: Assertion
-testNoMsgWithNoSubs = handleRequest (7::Int) publishMsg [] @?= ([], [])
+testNoMsgWithNoSubs = serviceRequest (7::Int) publishMsg [] @?= ClientMessages ([], [])
 
 testOneMsgWithExactSub :: Assertion
-testOneMsgWithExactSub = handleRequest (4::Int) publishMsg [("foo", 4)] @?= ([("foo", 4)], [(4, publishMsg)])
+testOneMsgWithExactSub = serviceRequest (4::Int) publishMsg [("foo", 4)] @?=
+                         ClientMessages([(4, publishMsg)], [("foo", 4)])
 
 testOneMsgWithWrongSub :: Assertion
-testOneMsgWithWrongSub = handleRequest (3::Int) publishMsg [("bar", 2)] @?= ([("bar", 2)], [])
+testOneMsgWithWrongSub = serviceRequest (3::Int) publishMsg [("bar", 2)] @?= ClientMessages([], [("bar", 2)])
 
 testOneMsgWithTwoSubs :: Assertion
 testOneMsgWithTwoSubs = do
-  handleRequest (1 :: Int) publishMsg [("foo", 1), ("bar", 2)] @?= ([("foo", 1), ("bar", 2)], [(1, publishMsg)])
-  handleRequest (2 :: Int) publishMsg [("baz", 3), ("boo", 3)] @?= ([("baz", 3), ("boo", 3)], [])
+  serviceRequest (1 :: Int) publishMsg [("foo", 1), ("bar", 2)] @?=
+                 ClientMessages([(1, publishMsg)], [("foo", 1), ("bar", 2)])
+  serviceRequest (2 :: Int) publishMsg [("baz", 3), ("boo", 3)] @?=
+                 ClientMessages([], [("baz", 3), ("boo", 3)])
 
 
 testAnotherMsgWithExactSub :: Assertion
 testAnotherMsgWithExactSub = do
-  handleRequest (5 :: Int) myPublish [("/foo/bar", 5)] @?= ([("/foo/bar", 5)], [(5, myPublish)])
+  serviceRequest (5 :: Int) myPublish [("/foo/bar", 5)] @?= ClientMessages([(5, myPublish)], [("/foo/bar", 5)])
                 where myPublish = pack $ [0x30, 16, 0, 8] ++
                                   strToBytes "/foo/bar" ++
                                   strToBytes "ohnoes"
 
 testTwoClients :: Assertion
 testTwoClients = do
-  handleRequest (5 :: Int) myPublish subscriptions @?= (subscriptions, [(5, myPublish)])
+  serviceRequest (5 :: Int) myPublish subscriptions @?= ClientMessages([(5, myPublish)], subscriptions)
                  where subscriptions = [("/foo/bar", 5), ("/bar/foo", 3)]
                        myPublish = pack $ [0x30, 16, 0, 8] ++
                                    strToBytes "/foo/bar" ++
@@ -168,7 +170,7 @@ testPing = testGroup "Ping" [ testCase "Ping" testPingImpl]
 
 testPingImpl :: Assertion
 testPingImpl = do
-  handleRequest (3 :: Int) ping subscriptions @?= (subscriptions, [(3, pong)])
+  serviceRequest (3 :: Int) ping subscriptions @?= ClientMessages([(3, pong)], subscriptions)
                 where subscriptions = [("/path/to", 3)]
                       ping = pack [0xc0, 0]
                       pong = pack [0xd0, 0]
