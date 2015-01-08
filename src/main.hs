@@ -25,8 +25,7 @@ socketHandler :: Subscriptions -> Socket -> IO ThreadId
 socketHandler subs socket = do
   (handle, _, _) <- accept socket
   hSetBinaryMode handle True
-  let rest = empty
-  forkIO $ handleConnection handle rest subs
+  forkIO $ handleConnection handle empty subs -- empty: no bytes yet
   socketHandler subs socket
 
 
