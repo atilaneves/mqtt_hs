@@ -1,8 +1,8 @@
-module Mqtt.Stream (nextMessage) where
+module Mqtt.Stream (nextMessage, containsFullMessage, mqttMessages) where
 
-import Mqtt.Message (getRemainingLength)
+import           Data.ByteString (pack, unpack)
 import qualified Data.ByteString as BS
-import Data.ByteString (pack, unpack)
+import           Mqtt.Message (getRemainingLength)
 
 
 -- Takes a packet and returns the next MQTT message and the remaining bytes
@@ -17,3 +17,24 @@ nextMessage pkt = if containsFullMessage pkt
 containsFullMessage :: BS.ByteString -> Bool
 containsFullMessage pkt = let size = getRemainingLength pkt in
                           size >= 0 && BS.length pkt >= size
+
+
+mqttMessages :: BS.ByteString -> ([BS.ByteString], BS.ByteString)
+mqttMessages bytes = if containsFullMessage bytes
+                     then (messages, rest)
+                     else ([], bytes)
+                          where (message, bytes') = nextMessage bytes
+                                messages = message : moreMessages
+                                (moreMessages, rest) = mqttMessages bytes'
+
+
+getMqttMessages :: (Monad m) => a -> BS.ByteString -> (a -> BS.ByteString -> m BS.ByteString) -> m [BS.ByteString]
+getMqttMessages handle bytes func = do
+  let (msgs, bytes') = mqttMessages bytes
+  if null msgs
+  then do
+    bytes'' <- func handle bytes'
+    getMqttMessages handle bytes'' func
+  else do
+    msgs' <- getMqttMessages handle bytes' func
+    return $ msgs ++ msgs'
