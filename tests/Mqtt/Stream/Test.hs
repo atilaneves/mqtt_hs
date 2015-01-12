@@ -8,7 +8,8 @@ import Data.ByteString (pack, append, empty)
 import Data.Word (Word8)
 import Data.Char (ord)
 import Data.Monoid (mconcat)
-import Mqtt.Stream (nextMessage, mqttMessages)
+import Control.Monad.State.Lazy
+import Mqtt.Stream (nextMessage, mqttMessages, mqttStream)
 
 
 testStream = testGroup "TCP Streams"
@@ -20,6 +21,8 @@ testStream = testGroup "TCP Streams"
              , testCase "Test disconnect msg" testDisconnectMsg
              , testCase "Test multiple disconnects" testMultipleDisconnect
              , testCase "Test multiple subscribes + garbage" testMultipleSubscribeThenGarbage
+             , testCase "Test empty MQTT stream" testEmptyMqttStream
+             , testCase "Test MQTT stream with 3 disconnects" testManyDisconnects
              ]
 
 
@@ -80,3 +83,27 @@ testMultipleSubscribeThenGarbage :: Assertion
 testMultipleSubscribeThenGarbage = mqttMessages bytes @?= (replicate 5 subscribeMsg, garbage)
     where bytes = (copies 5 subscribeMsg) `append` garbage
           garbage = pack [1, 255, 3]
+
+
+bytesReader :: a -> Control.Monad.State.Lazy.State [BS.ByteString] BS.ByteString
+bytesReader _ = do
+  msgs <- get
+  if null msgs
+  then return empty
+  else do
+    let (x:xs) = msgs
+    put xs
+    return x
+
+testEmptyMqttStream :: Assertion
+testEmptyMqttStream = result @?= msgs
+              where result = evalState (mqttStream handle bytesReader) msgs
+                    handle = 4 :: Int
+                    msgs = []
+
+
+testManyDisconnects :: Assertion
+testManyDisconnects = result @?= msgs
+              where result = evalState (mqttStream handle bytesReader) msgs
+                    handle = 4 :: Int
+                    msgs = map pack $ replicate 3 [0xe0, 0]
