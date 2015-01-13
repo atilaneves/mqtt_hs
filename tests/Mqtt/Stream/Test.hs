@@ -4,7 +4,7 @@ import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
 import qualified Data.ByteString as BS
-import Data.ByteString (pack, append, empty)
+import Data.ByteString (pack, unpack, append, empty)
 import Data.Word (Word8)
 import Data.Char (ord)
 import Data.Monoid (mconcat)
@@ -23,6 +23,7 @@ testStream = testGroup "TCP Streams"
              , testCase "Test multiple subscribes + garbage" testMultipleSubscribeThenGarbage
              , testCase "Test empty MQTT stream" testEmptyMqttStream
              , testCase "Test MQTT stream with 3 disconnects" testManyDisconnects
+             , testCase "Test MQTT stream with one byte at a time" testBytesStream
              ]
 
 
@@ -85,8 +86,8 @@ testMultipleSubscribeThenGarbage = mqttMessages bytes @?= (replicate 5 subscribe
           garbage = pack [1, 255, 3]
 
 
-bytesReader :: a -> Control.Monad.State.Lazy.State [BS.ByteString] BS.ByteString
-bytesReader _ = do
+msgsReader :: a -> Control.Monad.State.Lazy.State [BS.ByteString] BS.ByteString
+msgsReader _ = do
   msgs <- get
   if null msgs
   then return empty
@@ -97,13 +98,35 @@ bytesReader _ = do
 
 testEmptyMqttStream :: Assertion
 testEmptyMqttStream = result @?= msgs
-              where result = evalState (mqttStream handle bytesReader) msgs
+              where result = evalState (mqttStream handle msgsReader) msgs
                     handle = 4 :: Int
                     msgs = []
 
 
 testManyDisconnects :: Assertion
 testManyDisconnects = result @?= msgs
-              where result = evalState (mqttStream handle bytesReader) msgs
+              where result = evalState (mqttStream handle msgsReader) msgs
                     handle = 4 :: Int
                     msgs = map pack $ replicate 3 [0xe0, 0]
+
+
+bytesReader :: Int -> Control.Monad.State.Lazy.State BS.ByteString BS.ByteString
+bytesReader _ = do
+  bytes <- get
+  if BS.null bytes
+  then return empty
+  else do
+    let (x:xs) = unpack bytes
+    put $ pack xs
+    return $ pack [x]
+
+
+shouldEqual :: [BS.ByteString] -> [BS.ByteString] -> Assertion
+shouldEqual x y = (map unpack x) @?= (map unpack y)
+
+testBytesStream :: Assertion
+testBytesStream = result `shouldEqual` msgs
+    where result = evalState (mqttStream handle bytesReader) bytes
+          handle = 3 :: Int
+          msgs = map pack [[0xc0, 0], [0xc0, 0], [32, 2, 0, 0], [0xe0, 0]]
+          bytes = pack [0xc0, 0, 0xc0, 0, 32, 2, 0, 0, 0xe0, 0]

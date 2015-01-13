@@ -4,7 +4,6 @@ module Mqtt.Stream (nextMessage, containsFullMessage,
 import           Data.ByteString (pack, unpack, empty, append)
 import qualified Data.ByteString as BS
 import           Mqtt.Message (getRemainingLength)
-import Control.Monad.State.Lazy
 
 
 -- Takes a packet and returns the next MQTT message and the remaining bytes
@@ -42,7 +41,7 @@ mqttStreamImpl :: (Monad m) => BS.ByteString -> a -> (a -> m BS.ByteString) -> m
 mqttStreamImpl bytes handle func = do
   let (msgs, bytes') = mqttMessages bytes
   if null msgs
-  then do
+  then do -- no msgs, get more bytes from source
     bytes'' <- func handle
     if BS.null bytes''
     then return []
