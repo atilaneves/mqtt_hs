@@ -6,6 +6,7 @@ module Mqtt.Broker (
                    , getNumTopics
                    , topicMatches
                    , serviceRequest
+                   , replyStream
                    , Response(CloseConnection, ClientMessages)
                    ) where
 
@@ -15,6 +16,7 @@ import Mqtt.Message ( getMessageType
                     , remainingLengthGetter
                     , MqttType(Connect, Subscribe, Publish, PingReq, Disconnect)
                     )
+import Mqtt.Stream (mqttStream)
 import qualified Data.ByteString as BS
 import Data.ByteString (pack, unpack)
 import Data.Binary.Strict.Get
@@ -22,6 +24,7 @@ import Data.Bits (shiftR, (.&.))
 import Data.Word (Word8, Word16)
 import Data.Char (chr)
 import Data.List.Split (splitOn)
+import Control.Monad (liftM)
 
 type Topic = String
 type Subscription a = (Topic, a)
@@ -125,3 +128,16 @@ allPartsMatch pubElts subElts = let results = zipWith partMatches pubElts subElt
 -- whether a part of a topic matches, including the + wildcard
 partMatches :: String -> String -> Bool
 partMatches pubElt subElt = pubElt == subElt || subElt == "+"
+
+
+takeWhileInclusive :: (a -> Bool) -> [a] -> [a]
+takeWhileInclusive _ [] = []
+takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
+                                         else []
+
+replyStream :: (Monad m) => a -> (a -> m BS.ByteString) -> Subscriptions a -> m [Response a]
+replyStream handle func subs = liftM (takeWhileInclusive isNotClose) replies
+    where isNotClose CloseConnection = False
+          isNotClose _ = True
+          replies = liftM (map (\m -> serviceRequest handle m subs)) msgs
+          msgs = mqttStream handle func

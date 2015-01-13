@@ -3,7 +3,8 @@ module Mqtt.Broker.Test (testConnack
                         , testPublish
                         , testWildcards
                         , testDisconnect
-                        , testPing) where
+                        , testPing
+                        , testReplyStream) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -12,10 +13,12 @@ import Data.ByteString (pack, empty)
 import qualified Data.ByteString as BS
 import Data.Char (ord)
 import Data.Word (Word8)
+import Control.Monad.State.Lazy
 import Mqtt.Broker (
                    topicMatches
                    , serviceRequest
                    , Response(CloseConnection, ClientMessages)
+                   , replyStream
                    )
 
 
@@ -47,26 +50,30 @@ testConnack = testGroup "Connect" [ testCase "Test MQTT reply includes CONNACK" 
 char :: Char -> Word8
 char x = (fromIntegral $ ord x) :: Word8
 
+connectMsg :: BS.ByteString
+connectMsg = pack $ [0x10, 0x2a, -- fixed header
+                     0x00, 0x06] ++
+             [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p'] ++
+             [0x03, -- protocol version
+              0xcc, -- connection flags 1100111x user, pw, !wr, w(01), w, !c, x
+              0x00, 0x0a, -- keepalive of 10
+              0x00, 0x03, char 'c', char 'i', char 'd', -- client ID
+              0x00, 0x04, char 'w', char 'i', char 'l', char 'l', -- will topic
+              0x00, 0x04, char 'w', char 'm', char 's', char 'g', -- will msg
+              0x00, 0x07, -- size of username
+              char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l', -- username
+              0x00, 0x02, char 'p', char 'w'] --password
+
+
+connackMsg :: BS.ByteString
+connackMsg = pack [32, 2, 0, 0]
+
 
 -- Test that we get a MQTT CONNACK in reply to a CONNECT message
 testDecodeMqttConnect :: Assertion
-testDecodeMqttConnect = serviceRequest handle request subs @?= ClientMessages ([(handle, connack)], subs)
+testDecodeMqttConnect = serviceRequest handle connectMsg subs @?= ClientMessages ([(handle, connackMsg)], subs)
                            where handle = 3 :: Int
                                  subs = []
-                                 connack = pack [32, 2, 0, 0]
-                                 request = pack $ [0x10, 0x2a, -- fixed header
-                                                   0x00, 0x06] ++
-                                          [char 'M', char 'Q', char 'I', char 's', char 'd', char 'p'] ++
-                                          [0x03, -- protocol version
-                                           0xcc, -- connection flags 1100111x user, pw, !wr, w(01), w, !c, x
-                                           0x00, 0x0a, -- keepalive of 10
-                                           0x00, 0x03, char 'c', char 'i', char 'd', -- client ID
-                                           0x00, 0x04, char 'w', char 'i', char 'l', char 'l', -- will topic
-                                           0x00, 0x04, char 'w', char 'm', char 's', char 'g', -- will msg
-                                           0x00, 0x07, -- size of username
-                                           -- username
-                                           char 'g', char 'l', char 'i', char 'f', char 't', char 'e', char 'l',
-                                           0x00, 0x02, char 'p', char 'w'] --password
 
 
 
@@ -75,18 +82,25 @@ testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe m
                                    , testCase "Test MQTT SUBACK reply for SUBSCRIBE" testGetSuback
                                    , testCase "Test subscribe" testSubscribe
                                    ]
+
+subscribeTwoTopicsMsg :: BS.ByteString
+subscribeTwoTopicsMsg = pack $ [0x8c, 0x10, -- fixed header
+                                0x00, 0x21, -- message ID
+                                0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
+                                0x01, -- qos
+                                0x00, 0x03, char 'f', char 'o', char 'o',
+                                0x02 -- qos
+                               ]
+
+twoTopicsResponse :: Int -> Response Int
+twoTopicsResponse handle = ClientMessages ([(handle, pack [0x90, 0x04, 0x00, 0x21, 0, 0])],
+                                           [("first", handle), ("foo", handle)])
+
+
 testSubackTwoTopics :: Assertion
-testSubackTwoTopics = serviceRequest handle request [] @?=
-                      ClientMessages ([(handle, pack [0x90, 0x04, 0x00, 0x21, 0, 0])],
-                                      [("first", handle), ("foo", handle)])
+testSubackTwoTopics = serviceRequest handle subscribeTwoTopicsMsg [] @?= twoTopicsResponse handle
                     where handle = 4 :: Int
-                          request = pack $ [0x8c, 0x10, -- fixed header
-                                            0x00, 0x21, -- message ID
-                                            0x00, 0x05, char 'f', char 'i', char 'r', char 's', char 't',
-                                            0x01, -- qos
-                                            0x00, 0x03, char 'f', char 'o', char 'o',
-                                            0x02 -- qos
-                                            ]
+
 
 testSubackOneTopic :: Assertion
 testSubackOneTopic = serviceRequest (7::Int) request [] @?=
@@ -166,14 +180,18 @@ testTwoClients = do
                                    strToBytes "/foo/bar" ++
                                    strToBytes "ohnoes"
 
+pingMsg :: BS.ByteString
+pingMsg = pack [0xc0, 0]
+
+pongMsg :: BS.ByteString
+pongMsg = pack [0xd0, 0]
+
 testPing = testGroup "Ping" [ testCase "Ping" testPingImpl]
 
 testPingImpl :: Assertion
 testPingImpl = do
-  serviceRequest (3 :: Int) ping subscriptions @?= ClientMessages([(3, pong)], subscriptions)
+  serviceRequest (3 :: Int) pingMsg subscriptions @?= ClientMessages([(3, pongMsg)], subscriptions)
                 where subscriptions = [("/path/to", 3)]
-                      ping = pack [0xc0, 0]
-                      pong = pack [0xd0, 0]
 
 testWildcards = testGroup "Wildcards" [ testCase "Wildcard +" testWildcardPlus]
 
@@ -195,3 +213,46 @@ testWildcardPlus = do
   topicMatches "finance/stock" "#" @?= True
   topicMatches "finance/stock" "finance/stock/ibm" @?= False
   topicMatches "topics/foo/bar" "topics/foo/#" @?= True
+
+
+testReplyStream = testGroup "Reply stream"
+                  [
+                   testCase "Normal msg order" testNormalMsgOrder,
+                   testCase "Disconnect in the middle" testDisconnectInTheMiddle
+                  ]
+
+msgsReader :: a -> Control.Monad.State.Lazy.State [BS.ByteString] BS.ByteString
+msgsReader _ = do
+  msgs <- get
+  if null msgs
+  then return empty
+  else do
+    let (x:xs) = msgs
+    put xs
+    return x
+
+
+testNormalMsgOrder :: Assertion
+testNormalMsgOrder = result @?= replies
+    where result = evalState (replyStream handle msgsReader subs) msgs
+          subs = []
+          handle = 7 :: Int
+          msgs = [connectMsg, subscribeTwoTopicsMsg, pingMsg, disconnectMsg]
+          replies =
+              [ClientMessages ([(handle, connackMsg)], subs)] ++
+              [twoTopicsResponse handle] ++
+              [
+                ClientMessages ([(handle, pongMsg)], subs)
+              , CloseConnection
+              ]
+
+
+testDisconnectInTheMiddle :: Assertion
+testDisconnectInTheMiddle = result @?= replies
+    where result = evalState (replyStream handle msgsReader subs) msgs
+          subs = []
+          handle = 7 :: Int
+          msgs = [connectMsg, subscribeTwoTopicsMsg, disconnectMsg, pingMsg]
+          replies =
+              [ClientMessages ([(handle, connackMsg)], subs)] ++
+              [twoTopicsResponse handle] ++ [CloseConnection]
