@@ -16,8 +16,10 @@ nextMessage pkt = if containsFullMessage pkt
 
 -- This returns true if there is at least one full message in the byte stream
 containsFullMessage :: BS.ByteString -> Bool
-containsFullMessage pkt = let size = getRemainingLength pkt in
-                          size >= 0 && BS.length pkt >= size
+containsFullMessage pkt = let remaining = getRemainingLength pkt
+                              headerLen = 2
+                              totalLen = remaining + headerLen in
+                          remaining >= 0 && BS.length pkt >= totalLen
 
 -- Takes a bytestring and returns a list of MQTT messages plus a bytestring
 -- of remaining bytes

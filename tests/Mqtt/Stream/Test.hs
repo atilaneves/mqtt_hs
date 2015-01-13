@@ -21,6 +21,7 @@ testStream = testGroup "TCP Streams"
              , testCase "Test disconnect msg" testDisconnectMsg
              , testCase "Test multiple disconnects" testMultipleDisconnect
              , testCase "Test multiple subscribes + garbage" testMultipleSubscribeThenGarbage
+             , testCase "Test connack" testConnack
              , testCase "Test empty MQTT stream" testEmptyMqttStream
              , testCase "Test MQTT stream with 3 disconnects" testManyDisconnects
              , testCase "Test MQTT stream with one byte at a time" testBytesStream
@@ -68,6 +69,12 @@ testSubscribeMsgThenGarbage :: Assertion
 testSubscribeMsgThenGarbage = nextMessage (subscribeMsg `append` garbage) @?= (subscribeMsg, garbage)
     where garbage = pack [1, 2, 3]
 
+
+testConnack :: Assertion
+testConnack = do
+  nextMessage (pack [32, 2]) @?= (empty, pack [32, 2])
+  nextMessage (pack [32, 2, 0]) @?= (empty, pack [32, 2, 0])
+  nextMessage (pack  [32, 2, 0, 0]) @?= (pack [32, 2, 0, 0], empty)
 
 testDisconnectMsg :: Assertion
 testDisconnectMsg = nextMessage disconnectMsg @?= (disconnectMsg, empty)
