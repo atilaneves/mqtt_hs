@@ -18,6 +18,7 @@ import Mqtt.Broker (
                    topicMatches
                    , serviceRequest
                    , Response(CloseConnection, ClientMessages)
+                   , Subscriptions
                    , replyStream
                    )
 
@@ -92,14 +93,16 @@ subscribeTwoTopicsMsg = pack $ [0x8c, 0x10, -- fixed header
                                 0x02 -- qos
                                ]
 
+twoTopicSubs :: Int -> Subscriptions Int
+twoTopicSubs handle = [("first", handle), ("foo", handle)]
+
 twoTopicsResponse :: Int -> Response Int
 twoTopicsResponse handle = ClientMessages ([(handle, pack [0x90, 0x04, 0x00, 0x21, 0, 0])],
-                                           [("first", handle), ("foo", handle)])
-
+                                           twoTopicSubs handle)
 
 testSubackTwoTopics :: Assertion
 testSubackTwoTopics = serviceRequest handle subscribeTwoTopicsMsg [] @?= twoTopicsResponse handle
-                    where handle = 4 :: Int
+    where handle = 4 :: Int
 
 
 testSubackOneTopic :: Assertion
@@ -239,10 +242,10 @@ testNormalMsgOrder = result @?= replies
           handle = 7 :: Int
           msgs = [connectMsg, subscribeTwoTopicsMsg, pingMsg, disconnectMsg]
           replies =
-              [ClientMessages ([(handle, connackMsg)], subs)] ++
-              [twoTopicsResponse handle] ++
               [
-                ClientMessages ([(handle, pongMsg)], subs)
+               ClientMessages ([(handle, connackMsg)], subs)
+              , twoTopicsResponse handle
+              , ClientMessages ([(handle, pongMsg)], twoTopicSubs handle)
               , CloseConnection
               ]
 
@@ -254,5 +257,8 @@ testDisconnectInTheMiddle = result @?= replies
           handle = 7 :: Int
           msgs = [connectMsg, subscribeTwoTopicsMsg, disconnectMsg, pingMsg]
           replies =
-              [ClientMessages ([(handle, connackMsg)], subs)] ++
-              [twoTopicsResponse handle] ++ [CloseConnection]
+              [
+               ClientMessages ([(handle, connackMsg)], subs)
+              , twoTopicsResponse handle
+              , CloseConnection
+              ]
