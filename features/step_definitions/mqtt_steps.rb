@@ -1,6 +1,6 @@
 require 'socket'
 require 'timeout'
-require 'rspec-expectations'
+require 'rspec'
 
 class MqttServer
   def initialize
@@ -11,6 +11,9 @@ class MqttServer
     unless @proc.nil?
       Process.kill('QUIT', @proc.pid)
       Process.wait(@proc.pid)
+      puts 'Output:'
+      puts
+      @proc.each_line { |l| puts l }
     end
   end
 end

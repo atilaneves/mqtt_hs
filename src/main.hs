@@ -3,11 +3,12 @@ module Main where
 import Network
 import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode, hClose)
-import qualified Data.ByteString as BS
-import Data.ByteString (hPutStr, hGetSome, append, empty, pack)
-import Mqtt.Broker (handleRequest, Reply, Subscription)
-import Mqtt.Stream (nextMessage)
-import Control.Concurrent.STM;
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy as BS (null, append)
+import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNonBlocking)
+import Mqtt.Broker (serviceRequest, Reply, Subscription, Response(ClientMessages), Response(CloseConnection))
+import Mqtt.Stream (nextMessage, mqttStream)
+import Control.Concurrent.STM
 
 
 type SubscriptionIO = Subscription Handle
@@ -15,6 +16,7 @@ type Subscriptions = TVar [Subscription Handle]
 
 main :: IO ()
 main = withSocketsDo $ do
+         putStrLn "main"
          subs <- atomically $ newTVar [] -- empty subscriptions list
          socket <- listenOn $ PortNumber 1883
          socketHandler subs socket
@@ -24,48 +26,50 @@ main = withSocketsDo $ do
 socketHandler :: Subscriptions -> Socket -> IO ThreadId
 socketHandler subs socket = do
   (handle, _, _) <- accept socket
+  putStrLn $ "socketHandler on " ++ (show handle)
   hSetBinaryMode handle True
-  let rest = empty
-  forkIO $ handleConnection handle rest subs
+  forkIO $ handleConnection handle subs
   socketHandler subs socket
 
+handleConnection :: Handle -> Subscriptions -> IO ()
+handleConnection handle subsVar = do
+  handleConnectionImpl handle subsVar empty
+  putStrLn $ "Closing handle " ++ (show handle)
+  hClose handle
 
-handleConnection :: Handle -> BS.ByteString -> Subscriptions -> IO ()
-handleConnection handle bytes subs = do
-  pkt <- readBytes handle bytes
-  let (msg, pkt') = nextMessage pkt
-  if msg == pack [0xe0, 0]
-  then hClose handle
+handleConnectionImpl :: Handle -> Subscriptions -> BS.ByteString -> IO ()
+handleConnectionImpl handle subsVar bytes = do
+  let (msg, bytes') = nextMessage bytes
+  if BS.null msg
+  then do
+    bytes'' <- hGetNonBlocking handle 1024
+    if BS.null bytes''
+    then do
+      handleConnectionImpl handle subsVar bytes'
+    else do
+      putStrLn $ "recursing cos we's got bytes: " ++ (show $ unpack bytes'')
+      handleConnectionImpl handle subsVar (bytes' `BS.append` bytes'')
   else do
-    bytes' <- handlePacket handle msg pkt' subs
-    handleConnection handle bytes' subs
-
-readBytes :: Handle -> BS.ByteString -> IO BS.ByteString
-readBytes handle bytes = do
-  bytes' <- hGetSome handle 1024
-  return $ bytes `append` bytes'
-
-handlePacket :: Handle -> BS.ByteString -> BS.ByteString -> Subscriptions -> IO BS.ByteString
-handlePacket handle msg rest subsVar = do
-
-  replies <- atomically $ do
-               subs <- readTVar subsVar
-               let (subs', replies) = handleRequest handle msg subs
-               writeTVar subsVar subs'
-               return replies
-  handleReplies replies
-
-  if BS.null rest
-  then return rest
-  else handlePacket handle msg' rest' subsVar
-       where (msg', rest') = nextMessage rest
+    replies <- atomically $ do
+                 subs <- readTVar subsVar
+                 let response = serviceRequest handle msg subs
+                 case response of
+                   CloseConnection -> return []
+                   ClientMessages (replies, subs') -> do
+                     writeTVar subsVar subs'
+                     return replies
+    putStrLn $ "Replies: " ++ (show $ map (unpack . snd) replies)
+    handleReplies replies
+    if null replies
+    then do
+      putStrLn $ "Closing time... for " ++ (show handle)
+      return ()
+    else handleConnectionImpl handle subsVar bytes'
 
 
 handleReplies :: [Reply Handle] -> IO ()
 handleReplies [] = return ()
-handleReplies replies = do
+handleReplies (reply:replies) = do
   hPutStr replyHandle replyPacket
-  handleReplies (tail replies)
-    where reply = head replies
-          replyHandle = fst reply
-          replyPacket = snd reply
+  handleReplies replies
+    where (replyHandle, replyPacket) = reply
