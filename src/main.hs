@@ -4,7 +4,7 @@ import Network
 import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode, hClose)
 import qualified Data.ByteString.Lazy as BS
-import Data.ByteString.Lazy (hPutStr, hGetSome, append, empty, pack)
+import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack)
 import Mqtt.Broker (serviceRequest, Reply, Subscription, Response(ClientMessages))
 import Mqtt.Stream (nextMessage)
 import Control.Concurrent.STM;
@@ -41,7 +41,7 @@ handleConnection handle bytes subs = do
 
 readBytes :: Handle -> BS.ByteString -> IO BS.ByteString
 readBytes handle bytes = do
-  bytes' <- hGetSome handle 1024
+  bytes' <- hGet handle 1024
   return $ bytes `append` bytes'
 
 handlePacket :: Handle -> BS.ByteString -> BS.ByteString -> Subscriptions -> IO BS.ByteString

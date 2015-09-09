@@ -150,4 +150,15 @@ replyStream handle func subs = liftM (takeWhileInclusive notClosed) replies
     where notClosed CloseConnection = False
           notClosed _ = True
           msgs = mqttStream handle func
-          replies = liftM (map (\m -> serviceRequest handle m subs)) msgs
+          replies = fmap (\m -> msgsToReplis handle m subs) msgs
+
+
+-- Given a handle, a list of messages and subscriptions,
+-- return a list of replies
+msgsToReplis :: a -> [BS.ByteString] -> Subscriptions a -> [Response a]
+msgsToReplis _ [] _ = []
+msgsToReplis handle (msg:msgs) subs = [response] ++ msgsToReplis handle msgs subs'
+    where response = serviceRequest handle msg subs
+          subs' = case response of
+                    CloseConnection -> subs
+                    ClientMessages (replies, subs'') -> subs''
