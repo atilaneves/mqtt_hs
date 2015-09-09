@@ -23,13 +23,12 @@ executable mqtt_hs
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: ViewPatterns
-  build-depends:       base >=4.7 && <4.8
-                     , binary-strict >= 0.4.8.1
+  build-depends:       base
+                     , binary
                      , bytestring
                      , network
                      , split >= 0.2.2
                      , stm
-                     , mtl
 
 Test-suite test-mqtt
   main-is: ut.hs
@@ -42,6 +41,6 @@ Test-suite test-mqtt
                , test-framework
                , test-framework-hunit
                , bytestring
-               , binary-strict >= 0.4.8.1
+               , binary
                , split >= 0.2.2
                , mtl

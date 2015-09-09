@@ -3,8 +3,8 @@ module Main where
 import Network
 import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode, hClose)
-import qualified Data.ByteString as BS
-import Data.ByteString (hPutStr, hGetSome, append, empty, pack)
+import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Lazy (hPutStr, hGetSome, append, empty, pack)
 import Mqtt.Broker (serviceRequest, Reply, Subscription, Response(ClientMessages))
 import Mqtt.Stream (nextMessage)
 import Control.Concurrent.STM;

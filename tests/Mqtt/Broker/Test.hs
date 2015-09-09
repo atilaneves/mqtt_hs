@@ -9,8 +9,8 @@ module Mqtt.Broker.Test (testConnack
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString (pack, empty)
-import qualified Data.ByteString as BS
+import Data.ByteString.Lazy (pack, empty)
+import qualified Data.ByteString.Lazy as BS
 import Data.Char (ord)
 import Data.Word (Word8)
 import Control.Monad.State.Lazy

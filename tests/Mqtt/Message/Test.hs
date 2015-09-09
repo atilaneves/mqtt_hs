@@ -3,7 +3,7 @@ module Mqtt.Message.Test (testEncoding) where
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import Data.ByteString (pack)
+import Data.ByteString.Lazy (pack)
 import Data.Word (Word8)
 import Data.Char (ord)
 import Mqtt.Message (getNumTopics,
@@ -11,7 +11,7 @@ import Mqtt.Message (getNumTopics,
                      getRemainingLength,
                      getSubscriptionMsgId,
                      MqttType(Connect, ConnAck))
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BS
 
 
 -- Helper to transform a character into a byte

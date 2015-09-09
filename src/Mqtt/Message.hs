@@ -6,10 +6,11 @@ module Mqtt.Message (getMessageType,
                      getRemainingLength) where
 
 
-import qualified Data.ByteString as BS
-import Data.ByteString (uncons)
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy as BS (length)
+import Data.ByteString.Lazy (uncons)
 import Data.Bits (shiftL, shiftR, (.&.))
-import Data.Binary.Strict.Get
+import Data.Binary.Get
 import Data.Word (Word16)
 
 
@@ -38,14 +39,12 @@ getMessageType (uncons -> Just (msgType, _)) = toEnum $ (fromIntegral msgType) `
 
 
 getRemainingLength :: BS.ByteString -> Int
-getRemainingLength pkt = let (result, _) = runGet remainingLengthGetter pkt in
-                         case result of
-                           Left _ -> -1
-                           Right x -> x
+getRemainingLength pkt = if (BS.length pkt) < 2 then -1
+                         else runGet remainingLengthGetter pkt
 
 remainingLengthGetter :: Get Int
 remainingLengthGetter = do
-  getWord8 -- fixedHeader
+  _ <- getWord8 -- fixedHeader
   let value = 0
   let multiplier = 1
   remainingLengthGetterInner value multiplier
@@ -60,18 +59,20 @@ remainingLengthGetterInner value multiplier = do
 
 
 getSubscriptionMsgId :: BS.ByteString -> Word16
-getSubscriptionMsgId pkt = fromEither $ runGet subscriptionIdGetter pkt
+--getSubscriptionMsgId pkt = fromEither $ runGet subscriptionIdGetter pkt
+getSubscriptionMsgId pkt = runGet subscriptionIdGetter pkt
 
 subscriptionIdGetter :: Get Word16
 subscriptionIdGetter = do
-  remainingLengthGetter
+  _ <- remainingLengthGetter
   msgIdHi <- getWord8
   msgIdLo <- getWord8
   return $ (fromIntegral msgIdHi) `shiftL` 8 + (fromIntegral msgIdLo)
 
 
 getNumTopics :: BS.ByteString -> Int
-getNumTopics packet = fromEither (runGet numberOfTopicsRunner packet)
+--getNumTopics packet = fromEither (runGet numberOfTopicsRunner packet)
+getNumTopics packet = runGet numberOfTopicsRunner packet
 
 
 fromEither:: (Num n) => (Either String n, a) -> n
@@ -81,9 +82,9 @@ fromEither (Right x, _) = x
 
 numberOfTopicsRunner :: Get Int
 numberOfTopicsRunner = do
-  getWord8 -- fixedHeader
-  getWord8 -- remaining length
-  getWord16be -- msgId
+  _ <- getWord8 -- fixedHeader
+  _ <- getWord8 -- remaining length
+  _ <- getWord16be -- msgId
   numberOfTopics
 
 
@@ -94,6 +95,6 @@ numberOfTopics = do
      then return 0
      else do
        strLen <- getWord16be
-       getByteString $ fromIntegral strLen -- topic string
-       getWord8 -- qos
+       _ <- getByteString $ fromIntegral strLen -- topic string
+       _ <- getWord8 -- qos
        fmap (+1) numberOfTopics

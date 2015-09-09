@@ -3,8 +3,8 @@ module Mqtt.Stream.Test (testStream) where
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
 import Test.HUnit
-import qualified Data.ByteString as BS
-import Data.ByteString (pack, unpack, append, empty)
+import qualified Data.ByteString.Lazy as BS
+import Data.ByteString.Lazy (pack, unpack, append, empty)
 import Data.Word (Word8)
 import Data.Char (ord)
 import Data.Monoid (mconcat)
