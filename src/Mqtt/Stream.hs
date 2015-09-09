@@ -1,7 +1,7 @@
 module Mqtt.Stream (nextMessage, containsFullMessage,
                     mqttMessages, mqttStream) where
 
-import           Data.ByteString.Lazy (pack, unpack, empty, append)
+import           Data.ByteString.Lazy (pack, unpack, empty, append, uncons)
 import qualified Data.ByteString.Lazy as BS
 import           Mqtt.Message (getRemainingLength)
 
@@ -10,7 +10,7 @@ import           Mqtt.Message (getRemainingLength)
 nextMessage :: BS.ByteString -> (BS.ByteString, BS.ByteString)
 nextMessage pkt = if containsFullMessage pkt
                   then (pack $ take size (unpack pkt), pack $ drop size (unpack pkt))
-                  else (pack [], pkt)
+                  else (empty, pkt)
                       where size = getRemainingLength pkt + 2 -- 2 for header length
 
 
@@ -19,7 +19,10 @@ containsFullMessage :: BS.ByteString -> Bool
 containsFullMessage pkt = let remaining = getRemainingLength pkt
                               headerLen = 2
                               totalLen = remaining + headerLen in
-                          remaining >= 0 && BS.length pkt >= fromIntegral totalLen
+                          remaining >= 0 && lengthAtLeast pkt totalLen
+
+lengthAtLeast :: Integral n => BS.ByteString -> n -> Bool
+lengthAtLeast pkt totalLen = BS.length pkt >= fromIntegral totalLen
 
 -- Takes a bytestring and returns a list of MQTT messages plus a bytestring
 -- of remaining bytes
