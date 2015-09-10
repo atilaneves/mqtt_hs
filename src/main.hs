@@ -9,17 +9,17 @@ import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNon
 import Mqtt.Broker (unsubscribe, serviceRequest, Reply, Subscription,
                     Response(ClientMessages), Response(CloseConnection))
 import Mqtt.Stream (nextMessage, mqttStream)
-import Control.Concurrent.STM
+import Data.IORef
 
 
 type SubscriptionIO = Subscription Handle
-type Subscriptions = TVar [Subscription Handle]
+type Subscriptions = IORef [Subscription Handle]
 
 main :: IO ()
 main = withSocketsDo $ do
-         subs <- atomically $ newTVar [] -- empty subscriptions list
+         subsVar <- newIORef [] -- empty subscriptions list
          socket <- listenOn $ PortNumber 1883
-         socketHandler subs socket
+         socketHandler subsVar socket
          return ()
 
 
@@ -33,8 +33,7 @@ socketHandler subs socket = do
 handleConnection :: Handle -> Subscriptions -> IO ()
 handleConnection handle subsVar = do
   handleConnectionImpl handle subsVar empty
-  atomically $ do
-    modifyTVar subsVar (\s -> unsubscribe handle s)
+  modifyIORef' subsVar (unsubscribe handle)
   hClose handle
 
 handleConnectionImpl :: Handle -> Subscriptions -> BS.ByteString -> IO ()
@@ -49,20 +48,23 @@ handleConnectionImpl handle subsVar bytes = do
     else do
       handleConnectionImpl handle subsVar (bytes' `BS.append` bytes'')
   else do
-    replies <- atomically $ do
-                 subs <- readTVar subsVar
-                 let response = serviceRequest handle msg subs
-                 case response of
-                   CloseConnection -> return []
-                   ClientMessages (replies, subs') -> do
-                     writeTVar subsVar subs'
-                     return replies
+    subs <- readIORef subsVar
+    let response = serviceRequest handle msg subs
+    replies <- responseToReplies subsVar response
     handleReplies replies
     closed <- hIsClosed handle
     if null replies || closed
     then do
       return ()
     else handleConnectionImpl handle subsVar bytes'
+
+
+responseToReplies :: Subscriptions -> Response Handle -> IO [Reply Handle]
+responseToReplies subsVar response = case response of
+                                       CloseConnection -> return []
+                                       ClientMessages (replies, subs') -> do
+                                         writeIORef subsVar subs'
+                                         return replies
 
 
 handleReplies :: [Reply Handle] -> IO ()
