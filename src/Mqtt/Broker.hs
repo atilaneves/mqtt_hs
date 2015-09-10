@@ -172,5 +172,5 @@ replyStream2 handle func subs = liftM (takeWhileInclusive notClosed) replies
           msgs = mqttStream handle func
           replies = liftM (\m -> msgsToReplies handle m subs) msgs
 
-unsubscribe :: a -> Subscriptions a -> Subscriptions a
-unsubscribe = undefined
+unsubscribe :: Eq a => a -> Subscriptions a -> Subscriptions a
+unsubscribe handle subs = filter (\(t, h) -> h /= handle) subs

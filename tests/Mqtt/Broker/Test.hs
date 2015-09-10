@@ -140,7 +140,7 @@ testSubscribe = do
 testUnsubscribeClient :: Assertion
 testUnsubscribeClient = do
   let handle = 11
-  let subs = [("thingie", 1 :: Int), ("foo", 1), ("bar", 3)]
+  let subs = [("thingie", 11 :: Int), ("foo", 11), ("bar", 3)]
   unsubscribe 7 subs @?= subs -- no 7 in subs, should stay the same
   unsubscribe handle subs @?= [("bar", 3)] -- remove subscription
 
