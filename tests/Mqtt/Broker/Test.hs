@@ -4,7 +4,7 @@ module Mqtt.Broker.Test (testConnack
                         , testWildcards
                         , testDisconnect
                         , testPing
-                        , testReplyStream) where
+                        ) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -19,7 +19,7 @@ import Mqtt.Broker (
                    , serviceRequest
                    , Response(CloseConnection, ClientMessages)
                    , Subscriptions
-                   , replyStream
+                   , unsubscribe
                    )
 
 
@@ -82,6 +82,7 @@ testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe m
                                    , testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic
                                    , testCase "Test MQTT SUBACK reply for SUBSCRIBE" testGetSuback
                                    , testCase "Test subscribe" testSubscribe
+                                   , testCase "Test unsubscribe client" testUnsubscribeClient
                                    ]
 
 subscribeTwoTopicsMsg :: BS.ByteString
@@ -134,6 +135,13 @@ testSubscribe = do
                    ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("foo", 1), ("bar", 2), ("f", 9)])
   serviceRequest (9::Int) (pack [0x8c, 8, 0, 7, 0, 3, char 'f', char 'o', char 'o', 2]) [] @?=
                    ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("foo", 9)])
+
+testUnsubscribeClient :: Assertion
+testUnsubscribeClient = do
+  let handle = 11
+  let subs = [("thingie", 11 :: Int), ("foo", 11), ("bar", 3)]
+  unsubscribe 7 subs @?= subs -- no 7 in subs, should stay the same
+  unsubscribe handle subs @?= [("bar", 3)] -- remove subscription
 
 
 testPublish = testGroup "Publish" [ testCase "No msgs for no subs" testNoMsgWithNoSubs
@@ -216,49 +224,3 @@ testWildcardPlus = do
   topicMatches "finance/stock" "#" @?= True
   topicMatches "finance/stock" "finance/stock/ibm" @?= False
   topicMatches "topics/foo/bar" "topics/foo/#" @?= True
-
-
-testReplyStream = testGroup "Reply stream"
-                  [
-                   testCase "Normal msg order" testNormalMsgOrder,
-                   testCase "Disconnect in the middle" testDisconnectInTheMiddle
-                  ]
-
-msgsReader :: a -> Control.Monad.State.Lazy.State [BS.ByteString] BS.ByteString
-msgsReader _ = do
-  msgs <- get
-  if null msgs
-  then return empty
-  else do
-    let (x:xs) = msgs
-    put xs
-    return x
-
-
-testNormalMsgOrder :: Assertion
-testNormalMsgOrder = result @?= replies
-    where result = evalState (replyStream handle msgsReader subs) msgs
-          subs = []
-          handle = 7 :: Int
-          msgs = [connectMsg, subscribeTwoTopicsMsg, pingMsg, disconnectMsg]
-          replies =
-              [
-               ClientMessages ([(handle, connackMsg)], subs)
-              , twoTopicsResponse handle
-              , ClientMessages ([(handle, pongMsg)], twoTopicSubs handle)
-              , CloseConnection
-              ]
-
-
-testDisconnectInTheMiddle :: Assertion
-testDisconnectInTheMiddle = result @?= replies
-    where result = evalState (replyStream handle msgsReader subs) msgs
-          subs = []
-          handle = 7 :: Int
-          msgs = [connectMsg, subscribeTwoTopicsMsg, disconnectMsg, pingMsg]
-          replies =
-              [
-               ClientMessages ([(handle, connackMsg)], subs)
-              , twoTopicsResponse handle
-              , CloseConnection
-              ]

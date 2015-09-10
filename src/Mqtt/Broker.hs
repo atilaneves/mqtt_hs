@@ -6,7 +6,7 @@ module Mqtt.Broker (
                    , getNumTopics
                    , topicMatches
                    , serviceRequest
-                   , replyStream
+                   , unsubscribe
                    , Response(CloseConnection, ClientMessages)
                    ) where
 
@@ -132,41 +132,5 @@ allPartsMatch pubElts subElts = let results = zipWith partMatches pubElts subElt
 partMatches :: String -> String -> Bool
 partMatches pubElt subElt = pubElt == subElt || subElt == "+"
 
-
-takeWhileInclusive :: (a -> Bool) -> [a] -> [a]
-takeWhileInclusive _ [] = []
-takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
-                                         else []
-
--- Takes:
---   handle -> a handle to read from
---   func -> a function to get bytes from the handle
---   subs -> the current subscriptions
--- Returns:
---   A monad of responses
-
-replyStream :: (Monad m) => a -> (a -> m BS.ByteString) -> Subscriptions a -> m [Response a]
-replyStream handle func subs = liftM (takeWhileInclusive notClosed) replies
-    where notClosed CloseConnection = False
-          notClosed _ = True
-          msgs = mqttStream handle func
-          replies = fmap (\m -> msgsToReplies handle m subs) msgs
-
-
--- Given a handle, a list of messages and subscriptions,
--- return a list of replies
-msgsToReplies :: a -> [BS.ByteString] -> Subscriptions a -> [Response a]
-msgsToReplies _ [] _ = []
-msgsToReplies handle (msg:msgs) subs = [response] ++ msgsToReplies handle msgs subs'
-    where response = serviceRequest handle msg subs
-          subs' = case response of
-                    CloseConnection -> subs
-                    ClientMessages (replies, subs'') -> subs''
-
-
-replyStream2 :: (Monad m) => a -> (a -> m BS.ByteString) -> Subscriptions a -> m [Response a]
-replyStream2 handle func subs = liftM (takeWhileInclusive notClosed) replies
-    where notClosed CloseConnection = False
-          notClosed _ = True
-          msgs = mqttStream handle func
-          replies = liftM (\m -> msgsToReplies handle m subs) msgs
+unsubscribe :: Eq a => a -> Subscriptions a -> Subscriptions a
+unsubscribe handle subs = filter (\(t, h) -> h /= handle) subs

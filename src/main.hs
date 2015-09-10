@@ -2,11 +2,12 @@ module Main where
 
 import Network
 import Control.Concurrent
-import System.IO (Handle, hSetBinaryMode, hClose)
+import System.IO (Handle, hSetBinaryMode, hClose, hIsClosed)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as BS (null, append)
 import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNonBlocking)
-import Mqtt.Broker (serviceRequest, Reply, Subscription, Response(ClientMessages), Response(CloseConnection))
+import Mqtt.Broker (unsubscribe, serviceRequest, Reply, Subscription,
+                    Response(ClientMessages), Response(CloseConnection))
 import Mqtt.Stream (nextMessage, mqttStream)
 import Control.Concurrent.STM
 
@@ -16,7 +17,6 @@ type Subscriptions = TVar [Subscription Handle]
 
 main :: IO ()
 main = withSocketsDo $ do
-         putStrLn "main"
          subs <- atomically $ newTVar [] -- empty subscriptions list
          socket <- listenOn $ PortNumber 1883
          socketHandler subs socket
@@ -26,7 +26,6 @@ main = withSocketsDo $ do
 socketHandler :: Subscriptions -> Socket -> IO ThreadId
 socketHandler subs socket = do
   (handle, _, _) <- accept socket
-  putStrLn $ "socketHandler on " ++ (show handle)
   hSetBinaryMode handle True
   forkIO $ handleConnection handle subs
   socketHandler subs socket
@@ -34,7 +33,8 @@ socketHandler subs socket = do
 handleConnection :: Handle -> Subscriptions -> IO ()
 handleConnection handle subsVar = do
   handleConnectionImpl handle subsVar empty
-  putStrLn $ "Closing handle " ++ (show handle)
+  atomically $ do
+    modifyTVar subsVar (\s -> unsubscribe handle s)
   hClose handle
 
 handleConnectionImpl :: Handle -> Subscriptions -> BS.ByteString -> IO ()
@@ -47,7 +47,6 @@ handleConnectionImpl handle subsVar bytes = do
     then do
       handleConnectionImpl handle subsVar bytes'
     else do
-      putStrLn $ "recursing cos we's got bytes: " ++ (show $ unpack bytes'')
       handleConnectionImpl handle subsVar (bytes' `BS.append` bytes'')
   else do
     replies <- atomically $ do
@@ -58,11 +57,10 @@ handleConnectionImpl handle subsVar bytes = do
                    ClientMessages (replies, subs') -> do
                      writeTVar subsVar subs'
                      return replies
-    putStrLn $ "Replies: " ++ (show $ map (unpack . snd) replies)
     handleReplies replies
-    if null replies
+    closed <- hIsClosed handle
+    if null replies || closed
     then do
-      putStrLn $ "Closing time... for " ++ (show handle)
       return ()
     else handleConnectionImpl handle subsVar bytes'
 
@@ -70,6 +68,10 @@ handleConnectionImpl handle subsVar bytes = do
 handleReplies :: [Reply Handle] -> IO ()
 handleReplies [] = return ()
 handleReplies (reply:replies) = do
-  hPutStr replyHandle replyPacket
-  handleReplies replies
+  closed <- hIsClosed replyHandle
+  if closed
+  then return ()
+  else do
+    hPutStr replyHandle replyPacket
+    handleReplies replies
     where (replyHandle, replyPacket) = reply
