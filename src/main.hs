@@ -2,7 +2,7 @@ module Main where
 
 import Network
 import Control.Concurrent
-import System.IO (Handle, hSetBinaryMode, hClose)
+import System.IO (Handle, hSetBinaryMode, hClose, hIsClosed)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as BS (null, append)
 import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNonBlocking)
@@ -60,7 +60,8 @@ handleConnectionImpl handle subsVar bytes = do
                      return replies
     putStrLn $ "Replies: " ++ (show $ map (unpack . snd) replies)
     handleReplies replies
-    if null replies
+    closed <- hIsClosed handle
+    if null replies || closed
     then do
       putStrLn $ "Closing time... for " ++ (show handle)
       return ()
@@ -70,6 +71,10 @@ handleConnectionImpl handle subsVar bytes = do
 handleReplies :: [Reply Handle] -> IO ()
 handleReplies [] = return ()
 handleReplies (reply:replies) = do
-  hPutStr replyHandle replyPacket
-  handleReplies replies
+  closed <- hIsClosed replyHandle
+  if closed
+  then return ()
+  else do
+    hPutStr replyHandle replyPacket
+    handleReplies replies
     where (replyHandle, replyPacket) = reply
