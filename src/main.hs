@@ -15,6 +15,7 @@ import Data.IORef
 type SubscriptionIO = Subscription Handle
 type Subscriptions = IORef [Subscription Handle]
 
+
 main :: IO ()
 main = withSocketsDo $ do
          subsVar <- newIORef [] -- empty subscriptions list
@@ -30,11 +31,13 @@ socketHandler subs socket = do
   forkIO $ handleConnection handle subs
   socketHandler subs socket
 
+
 handleConnection :: Handle -> Subscriptions -> IO ()
 handleConnection handle subsVar = do
   handleConnectionImpl handle subsVar empty
   modifyIORef' subsVar (unsubscribe handle)
   hClose handle
+
 
 handleConnectionImpl :: Handle -> Subscriptions -> BS.ByteString -> IO ()
 handleConnectionImpl handle subsVar bytes = do
@@ -50,21 +53,20 @@ handleConnectionImpl handle subsVar bytes = do
   else do
     subs <- readIORef subsVar
     let response = serviceRequest handle msg subs
-    replies <- responseToReplies subsVar response
-    handleReplies replies
-    closed <- hIsClosed handle
-    if null replies || closed
-    then do
-      return ()
-    else handleConnectionImpl handle subsVar bytes'
+    handleResponse handle subsVar bytes' response
 
 
-responseToReplies :: Subscriptions -> Response Handle -> IO [Reply Handle]
-responseToReplies subsVar response = case response of
-                                       CloseConnection -> return []
-                                       ClientMessages (replies, subs') -> do
-                                         writeIORef subsVar subs'
-                                         return replies
+handleResponse :: Handle -> Subscriptions -> BS.ByteString -> Response Handle -> IO ()
+handleResponse handle subsVar bytes response =
+    case response of
+      CloseConnection -> return ()
+      ClientMessages (replies, subs') -> do
+        writeIORef subsVar subs'
+        handleReplies replies
+        closed <- hIsClosed handle
+        if null replies || closed
+        then return ()
+        else handleConnectionImpl handle subsVar bytes
 
 
 handleReplies :: [Reply Handle] -> IO ()
