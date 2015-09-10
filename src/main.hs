@@ -6,7 +6,8 @@ import System.IO (Handle, hSetBinaryMode, hClose, hIsClosed)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as BS (null, append)
 import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNonBlocking)
-import Mqtt.Broker (serviceRequest, Reply, Subscription, Response(ClientMessages), Response(CloseConnection))
+import Mqtt.Broker (unsubscribe, serviceRequest, Reply, Subscription,
+                    Response(ClientMessages), Response(CloseConnection))
 import Mqtt.Stream (nextMessage, mqttStream)
 import Control.Concurrent.STM
 
@@ -34,6 +35,8 @@ socketHandler subs socket = do
 handleConnection :: Handle -> Subscriptions -> IO ()
 handleConnection handle subsVar = do
   handleConnectionImpl handle subsVar empty
+  atomically $ do
+    modifyTVar subsVar (\s -> unsubscribe handle s)
   putStrLn $ "Closing handle " ++ (show handle)
   hClose handle
 
