@@ -4,7 +4,7 @@ module Mqtt.Broker.Test (testConnack
                         , testWildcards
                         , testDisconnect
                         , testPing
-                        , testReplyStream) where
+                        ) where
 
 import Test.Framework (testGroup)
 import Test.Framework.Providers.HUnit
@@ -19,7 +19,6 @@ import Mqtt.Broker (
                    , serviceRequest
                    , Response(CloseConnection, ClientMessages)
                    , Subscriptions
-                   , replyStream
                    , unsubscribe
                    )
 
@@ -225,49 +224,3 @@ testWildcardPlus = do
   topicMatches "finance/stock" "#" @?= True
   topicMatches "finance/stock" "finance/stock/ibm" @?= False
   topicMatches "topics/foo/bar" "topics/foo/#" @?= True
-
-
-testReplyStream = testGroup "Reply stream"
-                  [
-                   testCase "Normal msg order" testNormalMsgOrder,
-                   testCase "Disconnect in the middle" testDisconnectInTheMiddle
-                  ]
-
-msgsReader :: a -> Control.Monad.State.Lazy.State [BS.ByteString] BS.ByteString
-msgsReader _ = do
-  msgs <- get
-  if null msgs
-  then return empty
-  else do
-    let (x:xs) = msgs
-    put xs
-    return x
-
-
-testNormalMsgOrder :: Assertion
-testNormalMsgOrder = result @?= replies
-    where result = evalState (replyStream handle msgsReader subs) msgs
-          subs = []
-          handle = 7 :: Int
-          msgs = [connectMsg, subscribeTwoTopicsMsg, pingMsg, disconnectMsg]
-          replies =
-              [
-               ClientMessages ([(handle, connackMsg)], subs)
-              , twoTopicsResponse handle
-              , ClientMessages ([(handle, pongMsg)], twoTopicSubs handle)
-              , CloseConnection
-              ]
-
-
-testDisconnectInTheMiddle :: Assertion
-testDisconnectInTheMiddle = result @?= replies
-    where result = evalState (replyStream handle msgsReader subs) msgs
-          subs = []
-          handle = 7 :: Int
-          msgs = [connectMsg, subscribeTwoTopicsMsg, disconnectMsg, pingMsg]
-          replies =
-              [
-               ClientMessages ([(handle, connackMsg)], subs)
-              , twoTopicsResponse handle
-              , CloseConnection
-              ]
