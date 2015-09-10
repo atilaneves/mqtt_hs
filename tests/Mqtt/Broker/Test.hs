@@ -20,6 +20,7 @@ import Mqtt.Broker (
                    , Response(CloseConnection, ClientMessages)
                    , Subscriptions
                    , replyStream
+                   , unsubscribe
                    )
 
 
@@ -82,6 +83,7 @@ testSuback = testGroup "Subscribe" [ testCase "MQTT reply to 2 topic subscribe m
                                    , testCase "MQTT reply to 1 topic subscribe message" testSubackOneTopic
                                    , testCase "Test MQTT SUBACK reply for SUBSCRIBE" testGetSuback
                                    , testCase "Test subscribe" testSubscribe
+                                   , testCase "Test unsubscribe client" testUnsubscribeClient
                                    ]
 
 subscribeTwoTopicsMsg :: BS.ByteString
@@ -134,6 +136,13 @@ testSubscribe = do
                    ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("foo", 1), ("bar", 2), ("f", 9)])
   serviceRequest (9::Int) (pack [0x8c, 8, 0, 7, 0, 3, char 'f', char 'o', char 'o', 2]) [] @?=
                    ClientMessages ([(9, pack $ [0x90, 3, 0, 7, 0])], [("foo", 9)])
+
+testUnsubscribeClient :: Assertion
+testUnsubscribeClient = do
+  let handle = 11
+  let subs = [("thingie", 1 :: Int), ("foo", 1), ("bar", 3)]
+  unsubscribe 7 subs @?= subs -- no 7 in subs, should stay the same
+  unsubscribe handle subs @?= [("bar", 3)] -- remove subscription
 
 
 testPublish = testGroup "Publish" [ testCase "No msgs for no subs" testNoMsgWithNoSubs

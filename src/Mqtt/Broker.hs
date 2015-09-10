@@ -7,6 +7,7 @@ module Mqtt.Broker (
                    , topicMatches
                    , serviceRequest
                    , replyStream
+                   , unsubscribe
                    , Response(CloseConnection, ClientMessages)
                    ) where
 
@@ -170,3 +171,6 @@ replyStream2 handle func subs = liftM (takeWhileInclusive notClosed) replies
           notClosed _ = True
           msgs = mqttStream handle func
           replies = liftM (\m -> msgsToReplies handle m subs) msgs
+
+unsubscribe :: a -> Subscriptions a -> Subscriptions a
+unsubscribe = undefined
