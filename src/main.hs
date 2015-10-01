@@ -1,7 +1,7 @@
 module Main where
 
---import Network
 import Network.Simple.TCP
+import Network.Socket (isWritable, isReadable)
 import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode, hClose, hIsClosed)
 import qualified Data.ByteString.Lazy as BS
@@ -18,12 +18,7 @@ type Subscriptions = IORef [Subscription Socket]
 
 
 main :: IO ()
--- main = withSocketsDo $ do
---          subsVar <- newIORef [] -- empty subscriptions list
---          socket <- listenOn $ PortNumber 1883
---          socketHandler subsVar socket
---          return ()
-main = do
+main = withSocketsDo $ do
   subsVar <- newIORef [] -- empty subscriptions list
   serve HostAny "1883" (handleConnection subsVar)
 
@@ -53,38 +48,6 @@ handleConnectionImpl socket subsVar bytes = do
     handleResponse socket subsVar bytes' response
 
 
--- socketHandler :: Subscriptions -> Socket -> IO ThreadId
--- socketHandler subs socket = do
---   (handle, _, _) <- accept socket
---   hSetBinaryMode handle True
---   forkIO $ handleConnection handle subs
---   socketHandler subs socket
-
-
--- handleConnection :: Handle -> Subscriptions -> IO ()
--- handleConnection handle subsVar = do
---   handleConnectionImpl handle subsVar empty
---   modifyIORef' subsVar (unsubscribe handle)
---   hClose handle
-
-
--- handleConnectionImpl :: Handle -> Subscriptions -> BS.ByteString -> IO ()
--- handleConnectionImpl handle subsVar bytes = do
---   let (msg, bytes') = nextMessage bytes
---   if BS.null msg
---   then do
---     bytes'' <- hGetNonBlocking handle 1024
---     if BS.null bytes''
---     then do
---       handleConnectionImpl handle subsVar bytes'
---     else do
---       handleConnectionImpl handle subsVar (bytes' `BS.append` bytes'')
---   else do
---     subs <- readIORef subsVar
---     let response = serviceRequest handle msg subs
---     handleResponse handle subsVar bytes' response
-
-
 handleResponse :: Socket -> Subscriptions -> BS.ByteString -> Response Socket -> IO ()
 handleResponse socket subsVar bytes response =
     case response of
@@ -92,8 +55,9 @@ handleResponse socket subsVar bytes response =
       ClientMessages (replies, subs') -> do
         writeIORef subsVar subs'
         handleReplies replies
-        --closed <- hIsClosed socket
-        if null replies -- || closed
+        readable <- isReadable socket
+        let closed = not readable
+        if null replies || closed
         then return ()
         else handleConnectionImpl socket subsVar bytes
 
@@ -101,13 +65,10 @@ handleResponse socket subsVar bytes response =
 handleReplies :: [Reply Socket] -> IO ()
 handleReplies [] = return ()
 handleReplies (reply:replies) = do
-  sendLazy replySocket replyPacket
-  handleReplies replies
-  where (replySocket, replyPacket) = reply
-  -- closed <- hIsClosed replyHandle
-  -- if closed
-  -- then return ()
-  -- else do
-  --   hPutStr replyHandle replyPacket
-  --   handleReplies replies
-  --   where (replyHandle, replyPacket) = reply
+  let (replySocket, replyPacket) = reply
+  writable <- isWritable replySocket
+  if writable
+  then do
+    sendLazy replySocket replyPacket
+    handleReplies replies
+  else return ()
