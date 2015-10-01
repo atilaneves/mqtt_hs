@@ -6,7 +6,7 @@ import Control.Concurrent
 import System.IO (Handle, hSetBinaryMode, hClose, hIsClosed)
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as BS (null, append)
-import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNonBlocking)
+import Data.ByteString.Lazy (hPutStr, hGet, append, empty, pack, unpack, hGetNonBlocking, fromStrict)
 import Mqtt.Broker (unsubscribe, serviceRequest, Reply, Subscription,
                     Response(ClientMessages), Response(CloseConnection))
 import Mqtt.Stream (nextMessage, mqttStream)
@@ -14,7 +14,7 @@ import Data.IORef
 
 
 type SubscriptionIO = Subscription Handle
-type Subscriptions = IORef [Subscription Handle]
+type Subscriptions = IORef [Subscription Socket]
 
 
 main :: IO ()
@@ -34,10 +34,23 @@ handleConnection subsVar (socket, _) = do
   return ()
 
 
-handleConnectionImpl :: Socket -> Subscriptions -> BS.ByteString -> IO()
+handleConnectionImpl :: Socket -> Subscriptions -> BS.ByteString -> IO ()
 handleConnectionImpl socket subsVar bytes = do
-  putStrLn "Foo!"
-  handleConnectionImpl socket subsVar bytes
+  let (msg, bytes') = nextMessage bytes
+  if BS.null msg
+  then do
+    received <- recv socket 1024
+    case received of
+      Nothing -> return ()
+      Just strictBytes -> do
+        let bytes'' = fromStrict strictBytes
+        if BS.null bytes''
+        then handleConnectionImpl socket subsVar bytes'
+        else handleConnectionImpl socket subsVar (bytes' `BS.append` bytes'')
+  else do
+    subs <- readIORef subsVar
+    let response = serviceRequest socket msg subs
+    handleResponse socket subsVar bytes' response
 
 
 -- socketHandler :: Subscriptions -> Socket -> IO ThreadId
@@ -72,26 +85,29 @@ handleConnectionImpl socket subsVar bytes = do
 --     handleResponse handle subsVar bytes' response
 
 
--- handleResponse :: Handle -> Subscriptions -> BS.ByteString -> Response Handle -> IO ()
--- handleResponse handle subsVar bytes response =
---     case response of
---       CloseConnection -> return ()
---       ClientMessages (replies, subs') -> do
---         writeIORef subsVar subs'
---         handleReplies replies
---         closed <- hIsClosed handle
---         if null replies || closed
---         then return ()
---         else handleConnectionImpl handle subsVar bytes
+handleResponse :: Socket -> Subscriptions -> BS.ByteString -> Response Socket -> IO ()
+handleResponse socket subsVar bytes response =
+    case response of
+      CloseConnection -> return ()
+      ClientMessages (replies, subs') -> do
+        writeIORef subsVar subs'
+        handleReplies replies
+        --closed <- hIsClosed socket
+        if null replies -- || closed
+        then return ()
+        else handleConnectionImpl socket subsVar bytes
 
 
--- handleReplies :: [Reply Handle] -> IO ()
--- handleReplies [] = return ()
--- handleReplies (reply:replies) = do
---   closed <- hIsClosed replyHandle
---   if closed
---   then return ()
---   else do
---     hPutStr replyHandle replyPacket
---     handleReplies replies
---     where (replyHandle, replyPacket) = reply
+handleReplies :: [Reply Socket] -> IO ()
+handleReplies [] = return ()
+handleReplies (reply:replies) = do
+  sendLazy replySocket replyPacket
+  handleReplies replies
+  where (replySocket, replyPacket) = reply
+  -- closed <- hIsClosed replyHandle
+  -- if closed
+  -- then return ()
+  -- else do
+  --   hPutStr replyHandle replyPacket
+  --   handleReplies replies
+  --   where (replyHandle, replyPacket) = reply

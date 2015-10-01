@@ -11,9 +11,6 @@ class MqttServer
     unless @proc.nil?
       Process.kill('QUIT', @proc.pid)
       Process.wait(@proc.pid)
-      puts 'Output:'
-      puts
-      @proc.each_line { |l| puts l }
     end
   end
 end
@@ -177,7 +174,6 @@ Then(/^I should receive a message with topic "(.*?)" and payload "(.*?)"$/) do |
 end
 
 When(/^I successfully subscribe to topic "(.*?)"$/) do |topic|
-  puts "clients: #{@clients}"
   @clients[0].successfully_subscribe(topic, msg_id)
 end
 
