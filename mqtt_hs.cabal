@@ -29,6 +29,7 @@ executable mqtt_hs
                      , network
                      , split >= 0.2.2
                      , stm
+                     , network-simple
 
 Test-suite test-mqtt
   main-is: ut.hs
