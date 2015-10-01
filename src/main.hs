@@ -23,13 +23,21 @@ main :: IO ()
 --          socket <- listenOn $ PortNumber 1883
 --          socketHandler subsVar socket
 --          return ()
-main = serve HostAny "1883" handleConnection
+main = do
+  subsVar <- newIORef [] -- empty subscriptions list
+  serve HostAny "1883" (handleConnection subsVar)
 
 
-handleConnection :: (Socket, SockAddr) -> IO ()
-handleConnection _ = do
-  putStrLn "Foo!"
+handleConnection :: Subscriptions -> (Socket, SockAddr) -> IO ()
+handleConnection subsVar (socket, _) = do
+  handleConnectionImpl socket subsVar empty
   return ()
+
+
+handleConnectionImpl :: Socket -> Subscriptions -> BS.ByteString -> IO()
+handleConnectionImpl socket subsVar bytes = do
+  putStrLn "Foo!"
+  handleConnectionImpl socket subsVar bytes
 
 
 -- socketHandler :: Subscriptions -> Socket -> IO ThreadId
