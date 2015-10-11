@@ -16,15 +16,13 @@ import Mqtt.Message ( getMessageType
                     , remainingLengthGetter
                     , MqttType(Connect, Subscribe, Publish, PingReq, Disconnect)
                     )
-import Mqtt.Stream (mqttStream)
 import qualified Data.ByteString.Lazy as BS
-import Data.ByteString.Lazy (pack, unpack)
-import Data.Binary.Get (getByteString, runGet, getWord16be, getWord8, Get)
+import Data.ByteString.Lazy (pack)
+import Data.Binary.Get (runGet, getWord16be, getWord8, Get)
 import Data.Bits (shiftR, (.&.))
 import Data.Word (Word8, Word16)
 import Data.Char (chr)
 import Data.List.Split (splitOn)
-import Control.Monad (liftM)
 
 type Topic = String
 type Subscription a = (Topic, a)
@@ -89,16 +87,13 @@ getString n = do
   fmap (\xs -> [(chr. fromIntegral) x] ++ xs) (getString (n - 1))
 
 
-byteStringToString :: BS.ByteString -> String
-byteStringToString = map (chr . fromIntegral) . unpack
-
 getSubscriptionTopics :: BS.ByteString -> [String]
 getSubscriptionTopics = runGet subscriptionTopicsGetter
 
 subscriptionTopicsGetter :: Get [String]
 subscriptionTopicsGetter = do
   len <- remainingLengthGetter
-  getWord16be -- msgId
+  _ <- getWord16be -- msgId
   let len' = len - 2 -- subtract msgId length
   subscriptionTopicsGetterInner len'
 
@@ -107,7 +102,7 @@ subscriptionTopicsGetterInner 0 = return []
 subscriptionTopicsGetterInner numBytes = do
   topicLen <- getWord16be
   str <- getString topicLen
-  getWord8 -- qos
+  _ <- getWord8 -- qos
   let numBytes' = (numBytes - fromIntegral topicLen - 3) -- -2 because of str len & qos
   strs <- subscriptionTopicsGetterInner numBytes'
   return $ [str] ++ strs
@@ -133,4 +128,4 @@ partMatches :: String -> String -> Bool
 partMatches pubElt subElt = pubElt == subElt || subElt == "+"
 
 unsubscribe :: Eq a => a -> Subscriptions a -> Subscriptions a
-unsubscribe handle subs = filter (\(t, h) -> h /= handle) subs
+unsubscribe handle subs = filter (\(_, h) -> h /= handle) subs
