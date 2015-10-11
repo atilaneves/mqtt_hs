@@ -2,13 +2,12 @@ module Main where
 
 import Network.Simple.TCP
 import Network.Socket (isWritable, isReadable)
-import Control.Concurrent
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as BS (null, append)
 import Data.ByteString.Lazy (empty, fromStrict)
-import Mqtt.Broker (unsubscribe, serviceRequest, Reply, Subscription,
+import Mqtt.Broker (serviceRequest, Reply, Subscription,
                     Response(ClientMessages), Response(CloseConnection))
-import Mqtt.Stream (nextMessage, mqttStream)
+import Mqtt.Stream (nextMessage)
 import Data.IORef
 
 

@@ -4,6 +4,7 @@ module Mqtt.Broker.Test (testConnack
                         , testWildcards
                         , testDisconnect
                         , testPing
+                        , testTree
                         ) where
 
 import Test.Framework (testGroup)
@@ -21,6 +22,7 @@ import Mqtt.Broker (
                    , Subscriptions
                    , unsubscribe
                    )
+import Mqtt.Trie (SubscriptionTree(SubscriptionTree), applyForTopic)
 
 
 testDisconnect = testGroup "Disconnect"
@@ -224,3 +226,12 @@ testWildcardPlus = do
   topicMatches "finance/stock" "#" @?= True
   topicMatches "finance/stock" "finance/stock/ibm" @?= False
   topicMatches "topics/foo/bar" "topics/foo/#" @?= True
+
+
+testTree = testGroup "Tree impl" [testCase "" testEmptyTree
+                                 ]
+
+testEmptyTree :: Assertion
+testEmptyTree = do
+  let tree = SubscriptionTree [] :: SubscriptionTree Int
+  applyForTopic Just "foo" tree @?= []
