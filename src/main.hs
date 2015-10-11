@@ -60,13 +60,13 @@ handleResponse socket subsVar bytes response =
         else handleConnectionImpl socket subsVar bytes
 
 
-handleReplies :: [Reply Socket] -> IO ()
-handleReplies [] = return ()
-handleReplies (reply:replies) = do
-  let (replySocket, replyPacket) = reply
-  writable <- isWritable replySocket
+handleReply :: Reply Socket -> IO ()
+handleReply (socket, packet) = do
+  writable <- isWritable socket
   if writable
-  then do
-    sendLazy replySocket replyPacket
-    handleReplies replies
+  then sendLazy socket packet
   else return ()
+
+
+handleReplies :: [Reply Socket] -> IO ()
+handleReplies replies = mapM_ handleReply replies
