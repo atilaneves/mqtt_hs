@@ -7,7 +7,6 @@ module Mqtt.Message (getMessageType,
 
 
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Lazy as BS (length)
 import Data.ByteString.Lazy (uncons)
 import Data.Bits (shiftL, shiftR, (.&.))
 import Data.Binary.Get
@@ -59,7 +58,6 @@ remainingLengthGetterInner value multiplier = do
 
 
 getSubscriptionMsgId :: BS.ByteString -> Word16
---getSubscriptionMsgId pkt = fromEither $ runGet subscriptionIdGetter pkt
 getSubscriptionMsgId pkt = runGet subscriptionIdGetter pkt
 
 subscriptionIdGetter :: Get Word16
@@ -71,13 +69,7 @@ subscriptionIdGetter = do
 
 
 getNumTopics :: BS.ByteString -> Int
---getNumTopics packet = fromEither (runGet numberOfTopicsRunner packet)
 getNumTopics packet = runGet numberOfTopicsRunner packet
-
-
-fromEither:: (Num n) => (Either String n, a) -> n
-fromEither (Left _, _) = 0
-fromEither (Right x, _) = x
 
 
 numberOfTopicsRunner :: Get Int
